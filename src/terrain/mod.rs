@@ -134,7 +134,7 @@ impl Terrain {
             nodes: nodes,
             edges: edges,
             faces: faces,
-            rnd_pow: 5.0,
+            rnd_pow: 6.0,
             level: 0
         }
 
@@ -151,30 +151,6 @@ impl Terrain {
 
         normalize(&normal)
     }
-
-    //fn find_edges(&self, vertex: u32) -> Vec<Edge> {
-        //let mut result = Vec::with_capacity(6);
-
-        //for e in self.edges.iter() {
-            //if e[0] == vertex || e[1] == vertex {
-                //result.push(e.clone());
-            //}
-        //}
-
-        //result
-    //}
-
-    //pub fn find_faces(&self, vertex: u32) -> Vec<usize> {
-        //let mut result = Vec::with_capacity(8);
-
-        //for (i, f) in self.faces.iter().enumerate() {
-            //if f.points[0] == vertex || f.points[1] == vertex || f.points[2] == vertex {
-                //result.push(i);
-            //}
-        //}
-
-        //result
-    //}
 
     pub fn calculate_elevations(&self) -> (f32, f32) {
         let mut min_elev = f32::MAX;
@@ -195,7 +171,7 @@ impl Terrain {
         let num_faces = self.faces.len();
         let first_new_vertex = self.nodes.len() as u32;
 
-        self.rnd_pow *= 0.15;
+        self.rnd_pow *= 0.35;
 
         let mut new_edges = Vec::with_capacity(num_edges * 2 + num_faces * 3);
         let mut edge_index = HashMap::new();
@@ -279,6 +255,84 @@ impl Terrain {
 
         self.edges = new_edges;
         self.faces = new_faces;
+    }
+
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_terrain_has_edges_for_all_nodes() {
+        let terr = Terrain::new();
+
+        verify_edges_for_nodes(&terr, 5, 5);
+    }
+
+    #[test]
+    fn new_terrain_has_correct_face_to_edge_linkage() {
+        let terr = Terrain::new();
+
+        verify_face_to_edge_link(&terr);
+    }
+
+    #[test]
+    fn subdivided_terrain_has_edges_for_all_nodes() {
+        let mut terr = Terrain::new();
+        terr.subdivide();
+
+        verify_edges_for_nodes(&terr, 5, 6);
+    }
+
+    #[test]
+    fn subdivided_terrain_has_correct_face_to_edge_linkage() {
+        let mut terr = Terrain::new();
+        terr.subdivide();
+
+        verify_face_to_edge_link(&terr);
+    }
+
+    fn verify_edges_for_nodes(terr: &Terrain, min_edges: u32, max_edges: u32) {
+        let num_nodes = terr.nodes.len();
+        let mut seen_nodes = Vec::with_capacity(num_nodes);
+        for _ in 0..num_nodes {
+            seen_nodes.push(0);
+        }
+
+        for e in terr.edges.iter() {
+            let p0 = e[0] as usize;
+            let p1 = e[1] as usize;
+            assert!(p0 != p1, "Illegal edge between {} and {}", p0, p1);
+            seen_nodes[p0] += 1;
+            seen_nodes[p1] += 1;
+        }
+
+        for (i, n) in seen_nodes.into_iter().enumerate() {
+            assert!(n > 0, "No edge leading to node {}", i);
+            assert!(n >= min_edges && n <= max_edges, "Illegal number of edges leading to node {}: {}", i, n);
+        }
+    }
+
+    fn verify_face_to_edge_link(terr: &Terrain) {
+        for (i, f) in terr.faces.iter().enumerate() {
+            let p0 = f.points[0];
+            let p1 = f.points[1];
+            let p2 = f.points[2];
+
+            let e0 = terr.edges[f.edges[0] as usize];
+            let e1 = terr.edges[f.edges[1] as usize];
+            let e2 = terr.edges[f.edges[2] as usize];
+
+            let (e0_0, e0_1) = if p0 <= p1 { (p0, p1) } else { (p1, p0) };
+            let (e1_0, e1_1) = if p1 <= p2 { (p1, p2) } else { (p2, p1) };
+            let (e2_0, e2_1) = if p2 <= p0 { (p2, p0) } else { (p0, p2) };
+
+            assert_eq!((e0_0, e0_1), (e0[0], e0[1]), "Edge 0 of face {} mismatch", i);
+            assert_eq!((e1_0, e1_1), (e1[0], e1[1]), "Edge 1 of face {} mismatch", i);
+            assert_eq!((e2_0, e2_1), (e2[0], e2[1]), "Edge 2 of face {} mismatch", i);
+
+        }
     }
 
 }

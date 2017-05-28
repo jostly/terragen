@@ -1,4 +1,5 @@
 extern crate kiss3d;
+extern crate glfw;
 extern crate nalgebra as na;
 extern crate rand;
 #[macro_use]
@@ -8,12 +9,13 @@ extern crate env_logger;
 mod terrain;
 
 use na::{Vector3, UnitQuaternion, Point3, Point2};
-use na::normalize;
 use kiss3d::window::Window;
 use kiss3d::light::Light;
 use kiss3d::camera::ArcBall;
 use kiss3d::scene::SceneNode;
 use kiss3d::resource::Mesh;
+
+use glfw::{Action, Key, WindowEvent};
 
 use terrain::Terrain;
 
@@ -26,11 +28,8 @@ fn main() {
     env_logger::init().unwrap();
 
     let mut ico = Terrain::new();
-    for _ in 0..2 {
-        ico.subdivide();
-    }
 
-    let mut window = Window::new("Kiss3d: cube");
+    let mut window = Window::new("Terragen");
 
     let eye              = Point3::new(0.0, 2.0, 5.0);
     let at               = Point3::origin();
@@ -40,14 +39,55 @@ fn main() {
 
     let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.007);
 
-    let mut c = generate_regular(&mut window, &ico);
+    let mut grp = window.add_group();
+    let mut c = generate_regular(&mut grp, &ico);
 
     while window.render_with_camera(&mut arc_ball) {
-        c.prepend_to_local_rotation(&rot);
+        for mut event in window.events().iter() {
+            match event.value {
+                WindowEvent::Key(Key::Space, _, Action::Release, _) => {
+                    info!("Subdividing");
+                    window.remove(&mut c);
+                    ico.subdivide();
+                    c = generate_regular(&mut grp, &ico);
+                    event.inhibited = true
+                },
+                WindowEvent::Key(code, _, Action::Press, _) => {
+                    info!("You pressed the key with code: {:?}", code);
+                    info!("Do not try to press escape: the event is inhibited!");
+                    event.inhibited = true // override the default keyboard handler
+                },
+                WindowEvent::Key(code, _, Action::Release, _) => {
+                    info!("You released the key with code: {:?}", code);
+                    info!("Do not try to press escape: the event is inhibited!");
+                    event.inhibited = true // override the default keyboard handler
+                },
+                WindowEvent::MouseButton(button, Action::Press, mods) => {
+                    info!("You pressed the mouse button with code: {:?}", button);
+                    info!("You pressed the mouse button with modifiers: {:?}", mods);
+                    // dont override the default mouse handler
+                },
+                WindowEvent::MouseButton(button, Action::Release, mods) => {
+                    info!("You released the mouse button with code: {:?}", button);
+                    info!("You released the mouse button with modifiers: {:?}", mods);
+                    // dont override the default mouse handler
+                },
+                WindowEvent::CursorPos(x, y) => {
+                    info!("Cursor pos: ({} , {})", x, y);
+                    // dont override the default mouse handler
+                },
+                WindowEvent::Scroll(xshift, yshift) => {
+                    info!("Cursor pos: ({} , {})", xshift, yshift);
+                    // dont override the default mouse handler
+                },
+                _ => { }
+            }
+        }
+        grp.prepend_to_local_rotation(&rot);
     }
 }
 
-fn generate_regular(window: &mut Window, ico: &Terrain) -> SceneNode {
+fn generate_regular(window: &mut SceneNode, ico: &Terrain) -> SceneNode {
     let ico_faces = &ico.faces;
     let ico_vertices = &ico.nodes;
     let num_vertices = ico_faces.len()*3;
@@ -81,7 +121,7 @@ fn generate_regular(window: &mut Window, ico: &Terrain) -> SceneNode {
     let mut c = window.add_mesh(Rc::new(RefCell::new(mesh)), Vector3::new(1.0, 1.0, 1.0));
 
     c.set_color(1.0, 1.0, 1.0);
-    c.set_texture_from_file(&Path::new("media/colour_ramp.png"), "colour_ramp");
+    c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");
 
     c
 }

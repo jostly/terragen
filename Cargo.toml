@@ -6,4 +6,7 @@ authors = ["Johan Östling <johan.f.ostling@gmail.com>"]
 [dependencies]
 kiss3d = "0.9"
 nalgebra = "0.12"
+rand = "0.3"
+log = "0.3"
+env_logger = "0.3"
 

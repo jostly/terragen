@@ -134,7 +134,7 @@ impl Terrain {
             nodes: nodes,
             edges: edges,
             faces: faces,
-            rnd_pow: 6.0,
+            rnd_pow: 3.0,
             level: 0
         }
 
@@ -150,6 +150,18 @@ impl Terrain {
         }
 
         normalize(&normal)
+    }
+
+    pub fn face_midpoint(&self, face_idx: u32) -> Point3<f32> {
+        let face = &self.faces[face_idx as usize].points;
+        let mut midpoint = Vector3::new(0.0f32, 0.0, 0.0);
+
+        for p in face.iter() {
+            let vert = &self.nodes[*p as usize].point;
+            midpoint += vert.coords;
+        }
+
+        Point3::from_coordinates(midpoint / face.len() as f32)
     }
 
     pub fn calculate_elevations(&self) -> (f32, f32) {
@@ -171,7 +183,7 @@ impl Terrain {
         let num_faces = self.faces.len();
         let first_new_vertex = self.nodes.len() as u32;
 
-        self.rnd_pow *= 0.35;
+        self.rnd_pow *= 0.75;
 
         let mut new_edges = Vec::with_capacity(num_edges * 2 + num_faces * 3);
         let mut edge_index = HashMap::new();

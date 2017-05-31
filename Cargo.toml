@@ -9,5 +9,6 @@ nalgebra = "0.12"
 rand = "0.3"
 log = "0.3"
 env_logger = "0.3"
-glfw        = "0.8"
+glfw = "0.8"
+stopwatch = "0.0.7"
 

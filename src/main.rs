@@ -8,6 +8,7 @@ extern crate env_logger;
 extern crate stopwatch;
 
 mod terrain;
+mod math;
 
 use na::{Vector3, UnitQuaternion, Point3, Point2};
 use kiss3d::window::Window;
@@ -21,6 +22,7 @@ use glfw::{Action, Key, WindowEvent};
 use stopwatch::Stopwatch;
 
 use terrain::Terrain;
+use math::Vec3;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -31,15 +33,15 @@ fn main() {
     env_logger::init().unwrap();
 
     let mut ico = Terrain::new();
-    for _ in 0..6 {
+    for _ in 0..7 {
         ico.subdivide();
     }
 
     let mut window = Window::new("Terragen");
 
-    let eye              = Point3::new(0.0, 2.0, 5.0);
-    let at               = Point3::origin();
-    let mut arc_ball     = ArcBall::new(eye, at);
+    let eye = Point3::new(0.0, 2.0, 5.0);
+    let at = Point3::origin();
+    let mut arc_ball = ArcBall::new(eye, at);
 
     window.set_light(Light::StickToCamera);
 
@@ -64,8 +66,8 @@ fn main() {
                     c = add_mesh(&mut grp, mesh);
                     println!("Adding mesh took {}ms", sw.elapsed_ms());
                     event.inhibited = true
-                },
-                _ => { }
+                }
+                _ => {}
             }
         }
         grp.prepend_to_local_rotation(&rot);
@@ -84,7 +86,7 @@ fn add_mesh(parent: &mut SceneNode, mesh: Mesh) -> SceneNode {
 fn generate_regular(ico: &Terrain) -> Mesh {
     let ico_faces = &ico.faces;
     let ico_vertices = &ico.nodes;
-    let num_vertices = ico_faces.len()*3;
+    let num_vertices = ico_faces.len() * 3;
     let (min_elev, max_elev) = ico.calculate_elevations();
     let elev_scale = max_elev - min_elev;
     let mut vertices = Vec::with_capacity(num_vertices);
@@ -97,7 +99,7 @@ fn generate_regular(ico: &Terrain) -> Mesh {
         for idx in f.points.iter() {
             let ref vert = ico_vertices[*idx as usize];
             let elevation = (vert.elevation - min_elev) / elev_scale;
-            let vertex_scale = (elevation.powi(2) - 0.5)*0.02;
+            let vertex_scale = (elevation.powi(2) - 0.5) * 0.02;
             let vertex = Point3::from_coordinates(vert.point.coords * (1.0 + vertex_scale));
 
             vertices.push(vertex);
@@ -107,12 +109,36 @@ fn generate_regular(ico: &Terrain) -> Mesh {
             let uv = Point2::new(1.0 - elevation, 0.0);
             texcoords.push(uv);
         }
-        faces.push(Point3::new(vert_index, vert_index+1, vert_index+2));
+        faces.push(Point3::new(vert_index, vert_index + 1, vert_index + 2));
         vert_index += 3;
     }
 
     Mesh::new(vertices, faces, Some(normals), Some(texcoords), false)
 }
+/*
+
+  Generated vectors @ 0 ms
+  Calculated min/max elev @ 8 ms
+  Built node -> face index @ 214 ms
+  Built node -> edge index @ 441 ms
+  Built edge -> face index @ 702 ms
+  Built midpoint registry @ 1547 ms
+  Generated mesh in 4602 ms
+    Segment A: 187 ms
+    Segment B: 3796 ms
+      Segment B:0: 31 ms
+      Segment B:1: 416 ms
+      Segment B:2: 547 ms
+      Segment B:3: 1307 ms
+      Segment B:4: 212 ms
+    Segment C: 578 ms
+    Capacity mesh_faces:     983040 / 983052
+    Capacity mesh_vertices:  1146882 / 1146894
+    Capacity mesh_normals:   1146882 / 1146894
+    Capacity mesh_texcoords: 1146882 / 1146894
+  Creating mesh object in 0 ms
+
+ */
 
 fn generate_dual(terr: &Terrain) -> Mesh {
     println!("  Generator started...");
@@ -123,9 +149,22 @@ fn generate_dual(terr: &Terrain) -> Mesh {
     let num_faces = terr.faces.len();
 
     let mut mesh_faces = Vec::with_capacity(num_nodes * 6);
-    let mut mesh_vertices = Vec::with_capacity(mesh_faces.len() * 7);
-    let mut mesh_normals = Vec::with_capacity(mesh_vertices.len());
-    let mut mesh_texcoords = Vec::with_capacity(mesh_vertices.len());
+    let mut mesh_vertices = Vec::with_capacity(num_nodes * 7);
+    let mut mesh_normals = Vec::with_capacity(mesh_vertices.capacity());
+    let mut mesh_texcoords = Vec::with_capacity(mesh_vertices.capacity());
+
+    println!("    Capacity mesh_faces:     {} / {}",
+             mesh_faces.len(),
+             mesh_faces.capacity());
+    println!("    Capacity mesh_vertices:  {} / {}",
+             mesh_vertices.len(),
+             mesh_vertices.capacity());
+    println!("    Capacity mesh_normals:   {} / {}",
+             mesh_normals.len(),
+             mesh_normals.capacity());
+    println!("    Capacity mesh_texcoords: {} / {}",
+             mesh_texcoords.len(),
+             mesh_texcoords.capacity());
 
     println!("  Generated vectors @ {} ms", sw.elapsed_ms());
 
@@ -226,43 +265,51 @@ fn generate_dual(terr: &Terrain) -> Mesh {
 
         let normal = &node.point.coords;
         let mut n = 0;
-        let mut midpoint = Vector3::new(0.0f32, 0.0, 0.0);
+        let mut midpoint = Vec3::new(0.0f32, 0.0, 0.0);
 
         st_a.stop();
-        // SEGMENT B
+        // SEGMENT B  (3511 ms)
         st_b.start();
+        let nc = Vec3::new(normal.x, normal.y, normal.z);
 
         loop {
-            // SEGMENT B:0
-            st_b_0.start();
             let face_mid = face_midpoints[this_face_idx];
+            // SEGMENT B:0  (36 ms)
+            st_b_0.start();
+            midpoint += face_mid;
             st_b_0.stop();
-            // SEGMENT B:1
+            // SEGMENT B:1  (1118 ms)
             st_b_1.start();
-            midpoint += face_mid.coords;
-            mesh_vertices.push(face_mid);
-            mesh_normals.push(normal.clone());
             mesh_texcoords.push(uv.clone());
+            mesh_vertices.push(Point3::new(face_mid.x, face_mid.y, face_mid.z));
+            mesh_normals.push(Vector3::new(nc.x, nc.y, nc.z));
             n += 1;
 
             st_b_1.stop();
-            // SEGMENT B:2
+            // SEGMENT B:2  (544 ms)
             st_b_2.start();
 
             let face = &terr.faces[this_face_idx];
 
-            let other_point_idx =
-                if face.points[0] == i as u32 { 2 }
-                else if face.points[1] == i as u32 { 0 }
-                else { 1 };
+            let other_point_idx = if face.points[0] == i as u32 {
+                2
+            } else if face.points[1] == i as u32 {
+                0
+            } else {
+                1
+            };
 
             let other_point = face.points[other_point_idx];
             // Find the edge
-            let (e0, e1) = if i as u32 <= other_point { (i as u32, other_point) } else { (other_point, i as u32) };
+            let (e0, e1) = if i as u32 <= other_point {
+                (i as u32, other_point)
+            } else {
+                (other_point, i as u32)
+            };
 
             let mut edge_idx = usize::max_value();
             st_b_2.stop();
-            // SEGMENT B:3
+            // SEGMENT B:3  (1279 ms)
             st_b_3.start();
 
             for e in node_to_edges[i].iter() {
@@ -274,7 +321,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
             }
 
             st_b_3.stop();
-            // SEGMENT B:4
+            // SEGMENT B:4  (210 ms)
             st_b_4.start();
 
             assert!(edge_idx != usize::max_value());
@@ -295,7 +342,9 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         // SEGMENT C
         st_c.start();
 
-        mesh_vertices.push(Point3::from_coordinates(midpoint / n as f32));
+        midpoint /= (n as f32);
+
+        mesh_vertices.push(Point3::new(midpoint.x, midpoint.y, midpoint.z));
         mesh_normals.push(normal.clone());
 
         let center = curr_vertex + n;
@@ -317,9 +366,26 @@ fn generate_dual(terr: &Terrain) -> Mesh {
     println!("      Segment B:3: {} ms", st_b_3.elapsed_ms());
     println!("      Segment B:4: {} ms", st_b_4.elapsed_ms());
     println!("    Segment C: {} ms", st_c.elapsed_ms());
-    sw.restart();
 
-    let r = Mesh::new(mesh_vertices, mesh_faces, Some(mesh_normals), Some(mesh_texcoords), false);
+    println!("    Capacity mesh_faces:     {} / {}",
+             mesh_faces.len(),
+             mesh_faces.capacity());
+    println!("    Capacity mesh_vertices:  {} / {}",
+             mesh_vertices.len(),
+             mesh_vertices.capacity());
+    println!("    Capacity mesh_normals:   {} / {}",
+             mesh_normals.len(),
+             mesh_normals.capacity());
+    println!("    Capacity mesh_texcoords: {} / {}",
+             mesh_texcoords.len(),
+             mesh_texcoords.capacity());
+
+    sw.restart();
+    let r = Mesh::new(mesh_vertices,
+                      mesh_faces,
+                      Some(mesh_normals),
+                      Some(mesh_texcoords),
+                      false);
 
     println!("  Creating mesh object in {} ms", sw.elapsed_ms());
 

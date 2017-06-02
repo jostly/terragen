@@ -1,4 +1,4 @@
-use na::{Point2, Point3, normalize, Vector3};
+use na::Point3;
 use rand::random;
 
 use math::Vec3;
@@ -6,8 +6,18 @@ use math::Vec3;
 use std::f32;
 use std::collections::HashMap;
 
-pub type Vertex = Point3<f32>;
-pub type Edge = Point2<u32>;
+pub type Vertex = Vec3;
+
+pub struct Edge<V = u32> {
+    pub a: V,
+    pub b: V,
+}
+
+impl<V> Edge<V> {
+    pub fn new(a: V, b: V) -> Edge<V> {
+        Edge { a: a, b: b }
+    }
+}
 
 fn make_edge(a: u32, b: u32) -> Edge {
     if a > b {
@@ -143,16 +153,16 @@ impl Terrain {
         self.level
     }
 
-    pub fn normal(&self, face: &Point3<u32>) -> Vector3<f32> {
+    pub fn normal(&self, face: &Point3<u32>) -> Vec3 {
         // Normal is midpoint of face, normalized
-        let mut normal = Vector3::new(0.0f32, 0.0, 0.0);
+        let mut normal = Vec3::new(0.0f32, 0.0, 0.0);
 
         for p in face.iter() {
             let vert = &self.nodes[*p as usize].point;
-            normal += vert.coords;
+            normal += vert;
         }
 
-        normalize(&normal)
+        normal.normal()
     }
 
     //pub fn face_midpoint(&self, face_idx: u32) -> Point3<f32> {
@@ -204,26 +214,24 @@ impl Terrain {
         for e in self.edges.iter() {
 
             let (midpoint, elevation) = {
-                let p0 = &self.nodes[e[0] as usize];
-                let p1 = &self.nodes[e[1] as usize];
-                let delta = p1.point.coords - p0.point.coords;
+                let p0 = &self.nodes[e.a as usize];
+                let p1 = &self.nodes[e.b as usize];
+                let delta = p1.point - p0.point;
                 let e = (p1.elevation + p0.elevation) / 2.0;
-                ((p0.point.coords + delta * 0.5).clone(),
-                 e + (random::<f32>() - 0.5) * self.rnd_pow)
+                ((p0.point + delta * 0.5), e + (random::<f32>() - 0.5) * self.rnd_pow)
             };
 
             let vidx = self.nodes.len() as u32;
-            self.nodes
-                .push(Node::new(Vertex::from_coordinates(normalize(&midpoint)), elevation));
+            self.nodes.push(Node::new(midpoint.normal(), elevation));
 
-            debug!("Splitting edge ({}, {})", e[0], e[1]);
-            let e0 = make_edge(e[0], vidx);
-            let e1 = make_edge(e[1], vidx);
-            debug!("Generated edge ({}, {})", e[0], vidx);
-            edge_index.insert((e[0], vidx), new_edges.len() as u32);
+            debug!("Splitting edge ({}, {})", e.a, e.b);
+            let e0 = make_edge(e.a, vidx);
+            let e1 = make_edge(e.b, vidx);
+            debug!("Generated edge ({}, {})", e.a, vidx);
+            edge_index.insert((e.a, vidx), new_edges.len() as u32);
             new_edges.push(e0);
-            debug!("Generated edge ({}, {})", e[1], vidx);
-            edge_index.insert((e[1], vidx), new_edges.len() as u32);
+            debug!("Generated edge ({}, {})", e.b, vidx);
+            edge_index.insert((e.b, vidx), new_edges.len() as u32);
             new_edges.push(e1);
         }
 

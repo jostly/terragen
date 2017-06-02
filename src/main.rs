@@ -58,7 +58,7 @@ fn main() {
                     window.remove(&mut c);
                     let mut sw = Stopwatch::start_new();
                     ico.subdivide();
-                    println!("Subdivision took {}ms", sw.elapsed_ms());
+                    println!("Subdivision took {}ms", sw.elapsed_ms()); // (2099 ms) (lvl 6)
                     sw.restart();
                     let mesh = generate_dual(&ico);
                     println!("Generating mesh took {}ms", sw.elapsed_ms());
@@ -83,6 +83,7 @@ fn add_mesh(parent: &mut SceneNode, mesh: Mesh) -> SceneNode {
     c
 }
 
+/*
 fn generate_regular(ico: &Terrain) -> Mesh {
     let ico_faces = &ico.faces;
     let ico_vertices = &ico.nodes;
@@ -115,6 +116,7 @@ fn generate_regular(ico: &Terrain) -> Mesh {
 
     Mesh::new(vertices, faces, Some(normals), Some(texcoords), false)
 }
+*/
 /*
 
   Generated vectors @ 0 ms
@@ -148,8 +150,8 @@ fn generate_dual(terr: &Terrain) -> Mesh {
     let num_edges = terr.edges.len();
     let num_faces = terr.faces.len();
 
-    let mut mesh_faces = Vec::with_capacity(num_nodes * 6);
-    let mut mesh_vertices = Vec::with_capacity(num_nodes * 7);
+    let mut mesh_faces = Vec::with_capacity(num_nodes * 6 - 12);
+    let mut mesh_vertices = Vec::with_capacity(num_nodes * 7 - 12);
     let mut mesh_normals = Vec::with_capacity(mesh_vertices.capacity());
     let mut mesh_texcoords = Vec::with_capacity(mesh_vertices.capacity());
 
@@ -171,7 +173,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
     let (min_elev, max_elev) = terr.calculate_elevations();
     let elev_scale = max_elev - min_elev;
 
-    println!("  Calculated min/max elev @ {} ms", sw.elapsed_ms());
+    println!("  Calculated min/max elev @ {} ms", sw.elapsed_ms()); // (7 ms)
 
     // Build map of node index -> faces
     let node_to_faces = {
@@ -188,7 +190,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         node_to_faces
     };
 
-    println!("  Built node -> face index @ {} ms", sw.elapsed_ms());
+    println!("  Built node -> face index @ {} ms", sw.elapsed_ms()); // (209 ms)
 
     // Build map of node index -> edges
     let node_to_edges = {
@@ -198,14 +200,13 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         }
 
         for (i, edge) in terr.edges.iter().enumerate() {
-            for v in edge.iter() {
-                node_to_edges[*v as usize].push(i);
-            }
+            node_to_edges[edge.a as usize].push(i);
+            node_to_edges[edge.b as usize].push(i);
         }
         node_to_edges
     };
 
-    println!("  Built node -> edge index @ {} ms", sw.elapsed_ms());
+    println!("  Built node -> edge index @ {} ms", sw.elapsed_ms()); // (360 ms)
 
     // Build map of edge index -> faces
     let edge_to_faces = {
@@ -222,7 +223,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         edge_to_faces
     };
 
-    println!("  Built edge -> face index @ {} ms", sw.elapsed_ms());
+    println!("  Built edge -> face index @ {} ms", sw.elapsed_ms()); // (624 ms)
 
     let face_midpoints = {
         let mut face_midpoints = Vec::with_capacity(num_faces);
@@ -232,7 +233,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         face_midpoints
     };
 
-    println!("  Built midpoint registry @ {} ms", sw.elapsed_ms());
+    println!("  Built midpoint registry @ {} ms", sw.elapsed_ms()); // (862 ms)
 
     let mut st_a = Stopwatch::new();
     let mut st_b = Stopwatch::new();
@@ -247,7 +248,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
 
     for (i, node) in terr.nodes.iter().enumerate() {
 
-        // SEGMENT A
+        // SEGMENT A  (126 ms)
         st_a.start();
 
         // Find the faces that contain this node
@@ -263,14 +264,13 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         let uv = Point2::new(1.0 - elevation.powf(1.5), 0.0);
         mesh_texcoords.push(uv.clone());
 
-        let normal = &node.point.coords;
+        let normal = &node.point;
         let mut n = 0;
         let mut midpoint = Vec3::new(0.0f32, 0.0, 0.0);
 
         st_a.stop();
-        // SEGMENT B  (3511 ms)
+        // SEGMENT B  (2604 ms)
         st_b.start();
-        let nc = Vec3::new(normal.x, normal.y, normal.z);
 
         loop {
             let face_mid = face_midpoints[this_face_idx];
@@ -278,15 +278,15 @@ fn generate_dual(terr: &Terrain) -> Mesh {
             st_b_0.start();
             midpoint += face_mid;
             st_b_0.stop();
-            // SEGMENT B:1  (1118 ms)
+            // SEGMENT B:1  (1099 ms)
             st_b_1.start();
             mesh_texcoords.push(uv.clone());
-            mesh_vertices.push(Point3::new(face_mid.x, face_mid.y, face_mid.z));
-            mesh_normals.push(Vector3::new(nc.x, nc.y, nc.z));
+            mesh_vertices.push(face_mid.to_point3());
+            mesh_normals.push(normal.to_vector3());
             n += 1;
 
             st_b_1.stop();
-            // SEGMENT B:2  (544 ms)
+            // SEGMENT B:2  (533 ms)
             st_b_2.start();
 
             let face = &terr.faces[this_face_idx];
@@ -309,12 +309,12 @@ fn generate_dual(terr: &Terrain) -> Mesh {
 
             let mut edge_idx = usize::max_value();
             st_b_2.stop();
-            // SEGMENT B:3  (1279 ms)
+            // SEGMENT B:3  (405 ms)
             st_b_3.start();
 
             for e in node_to_edges[i].iter() {
-                let te = terr.edges[*e];
-                if te[0] == e0 && te[1] == e1 {
+                let ref te = terr.edges[*e];
+                if te.a == e0 && te.b == e1 {
                     edge_idx = *e;
                     break;
                 }
@@ -339,13 +339,13 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         st_b_4.stop();
 
         st_b.stop();
-        // SEGMENT C
+        // SEGMENT C  (587 ms)
         st_c.start();
 
         midpoint /= (n as f32);
 
-        mesh_vertices.push(Point3::new(midpoint.x, midpoint.y, midpoint.z));
-        mesh_normals.push(normal.clone());
+        mesh_vertices.push(midpoint.to_point3());
+        mesh_normals.push(normal.to_vector3());
 
         let center = curr_vertex + n;
         for j in 0..n {
@@ -357,7 +357,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         st_c.stop();
     }
 
-    println!("  Generated mesh in {} ms", sw.elapsed_ms());
+    println!("  Generated mesh in {} ms", sw.elapsed_ms()); // (3353 ms)
     println!("    Segment A: {} ms", st_a.elapsed_ms());
     println!("    Segment B: {} ms", st_b.elapsed_ms());
     println!("      Segment B:0: {} ms", st_b_0.elapsed_ms());

@@ -1,7 +1,7 @@
 use std::ops::*;
 use na::{Point3, Vector3};
 
-#[derive(Clone, Copy, Debug)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Vec3 {
     data: [f32; 3],
 }
@@ -9,14 +9,6 @@ pub struct Vec3 {
 impl Vec3 {
     pub fn new(x: f32, y: f32, z: f32) -> Vec3 {
         Vec3 { data: [x, y, z] }
-    }
-
-    pub fn to_point3(&self) -> Point3<f32> {
-        Point3::new(self.data[0], self.data[1], self.data[2])
-    }
-
-    pub fn to_vector3(&self) -> Vector3<f32> {
-        Vector3::new(self.data[0], self.data[1], self.data[2])
     }
 
     pub fn length(&self) -> f32 {
@@ -27,6 +19,18 @@ impl Vec3 {
     pub fn normal(&self) -> Vec3 {
         let l = self.length();
         if l == 0.0 { *self } else { *self / l }
+    }
+}
+
+impl<'a> From<&'a Vec3> for Vector3<f32> {
+    fn from(v: &'a Vec3) -> Self {
+        Vector3::new(v.data[0], v.data[1], v.data[2])
+    }
+}
+
+impl<'a> From<&'a Vec3> for Point3<f32> {
+    fn from(v: &'a Vec3) -> Self {
+        Point3::new(v.data[0], v.data[1], v.data[2])
     }
 }
 

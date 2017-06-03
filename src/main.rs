@@ -281,8 +281,8 @@ fn generate_dual(terr: &Terrain) -> Mesh {
             // SEGMENT B:1  (1099 ms)
             st_b_1.start();
             mesh_texcoords.push(uv.clone());
-            mesh_vertices.push(face_mid.to_point3());
-            mesh_normals.push(normal.to_vector3());
+            mesh_vertices.push(Point3::from(&face_mid));
+            mesh_normals.push(Vector3::from(normal));
             n += 1;
 
             st_b_1.stop();
@@ -344,8 +344,8 @@ fn generate_dual(terr: &Terrain) -> Mesh {
 
         midpoint /= (n as f32);
 
-        mesh_vertices.push(midpoint.to_point3());
-        mesh_normals.push(normal.to_vector3());
+        mesh_vertices.push(Point3::from(&midpoint));
+        mesh_normals.push(Vector3::from(normal));
 
         let center = curr_vertex + n;
         for j in 0..n {

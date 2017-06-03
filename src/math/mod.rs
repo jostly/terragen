@@ -3,17 +3,18 @@ use na::{Point3, Vector3};
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Vec3 {
-    data: [f32; 3],
+    pub x: f32,
+    pub y: f32,
+    pub z: f32,
 }
 
 impl Vec3 {
     pub fn new(x: f32, y: f32, z: f32) -> Vec3 {
-        Vec3 { data: [x, y, z] }
+        Vec3 { x: x, y: y, z: z }
     }
 
     pub fn length(&self) -> f32 {
-        (self.data[0] * self.data[0] + self.data[1] * self.data[1] + self.data[2] * self.data[2])
-            .sqrt()
+        (self.x * self.x + self.y * self.y + self.z * self.z).sqrt()
     }
 
     pub fn normal(&self) -> Vec3 {
@@ -24,21 +25,13 @@ impl Vec3 {
 
 impl<'a> From<&'a Vec3> for Vector3<f32> {
     fn from(v: &'a Vec3) -> Self {
-        Vector3::new(v.data[0], v.data[1], v.data[2])
+        Vector3::new(v.x, v.y, v.z)
     }
 }
 
 impl<'a> From<&'a Vec3> for Point3<f32> {
     fn from(v: &'a Vec3) -> Self {
-        Point3::new(v.data[0], v.data[1], v.data[2])
-    }
-}
-
-impl Index<usize> for Vec3 {
-    type Output = f32;
-
-    fn index(&self, idx: usize) -> &Self::Output {
-        &self.data[idx]
+        Point3::new(v.x, v.y, v.z)
     }
 }
 
@@ -46,9 +39,7 @@ impl Add for Vec3 {
     type Output = Vec3;
 
     fn add(self, other: Vec3) -> Vec3 {
-        Vec3::new(self.data[0] + other.data[0],
-                  self.data[1] + other.data[1],
-                  self.data[2] + other.data[2])
+        Vec3::new(self.x + other.x, self.y + other.y, self.z + other.z)
     }
 }
 
@@ -56,25 +47,23 @@ impl<'a> Add<&'a Vec3> for Vec3 {
     type Output = Vec3;
 
     fn add(self, other: &'a Vec3) -> Vec3 {
-        Vec3::new(self.data[0] + other.data[0],
-                  self.data[1] + other.data[1],
-                  self.data[2] + other.data[2])
+        Vec3::new(self.x + other.x, self.y + other.y, self.z + other.z)
     }
 }
 
 impl AddAssign for Vec3 {
     fn add_assign(&mut self, other: Vec3) {
-        self.data[0] += other.data[0];
-        self.data[1] += other.data[1];
-        self.data[2] += other.data[2];
+        self.x += other.x;
+        self.y += other.y;
+        self.z += other.z;
     }
 }
 
 impl<'a> AddAssign<&'a Vec3> for Vec3 {
     fn add_assign(&mut self, other: &'a Vec3) {
-        self.data[0] += other.data[0];
-        self.data[1] += other.data[1];
-        self.data[2] += other.data[2];
+        self.x += other.x;
+        self.y += other.y;
+        self.z += other.z;
     }
 }
 
@@ -82,9 +71,7 @@ impl Sub for Vec3 {
     type Output = Vec3;
 
     fn sub(self, other: Vec3) -> Vec3 {
-        Vec3::new(self.data[0] - other.data[0],
-                  self.data[1] - other.data[1],
-                  self.data[2] - other.data[2])
+        Vec3::new(self.x - other.x, self.y - other.y, self.z - other.z)
     }
 }
 
@@ -92,9 +79,7 @@ impl Mul<f32> for Vec3 {
     type Output = Vec3;
 
     fn mul(self, _rhs: f32) -> Vec3 {
-        Vec3::new(self.data[0] * _rhs,
-                  self.data[1] * _rhs,
-                  self.data[2] * _rhs)
+        Vec3::new(self.x * _rhs, self.y * _rhs, self.z * _rhs)
     }
 }
 
@@ -102,16 +87,14 @@ impl Div<f32> for Vec3 {
     type Output = Vec3;
 
     fn div(self, _rhs: f32) -> Vec3 {
-        Vec3::new(self.data[0] / _rhs,
-                  self.data[1] / _rhs,
-                  self.data[2] / _rhs)
+        Vec3::new(self.x / _rhs, self.y / _rhs, self.z / _rhs)
     }
 }
 
 impl DivAssign<f32> for Vec3 {
     fn div_assign(&mut self, _rhs: f32) {
-        self.data[0] /= _rhs;
-        self.data[1] /= _rhs;
-        self.data[2] /= _rhs;
+        self.x /= _rhs;
+        self.y /= _rhs;
+        self.z /= _rhs;
     }
 }

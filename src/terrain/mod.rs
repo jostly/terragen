@@ -153,37 +153,14 @@ impl Terrain {
         self.level
     }
 
-    pub fn normal(&self, face: &Point3<u32>) -> Vec3 {
-        // Normal is midpoint of face, normalized
-        let mut normal = Vec3::new(0.0f32, 0.0, 0.0);
-
-        for p in face.iter() {
-            let vert = &self.nodes[*p as usize].point;
-            normal += vert;
-        }
-
-        normal.normal()
-    }
-
-    //pub fn face_midpoint(&self, face_idx: u32) -> Point3<f32> {
-    //let face = &self.faces[face_idx as usize].points;
-    //let mut midpoint = Vector3::new(0.0f32, 0.0, 0.0);
-
-    //for p in face.iter() {
-    //let vert = &self.nodes[*p as usize].point;
-    //midpoint += vert.coords;
-    //}
-    //Point3::from_coordinates(midpoint / 3.0)
-    //}
-
     pub fn face_midpoint(&self, face: &Face) -> Vec3 {
         let pindex = &face.points;
         let p0 = &self.nodes[pindex[0] as usize].point;
         let p1 = &self.nodes[pindex[1] as usize].point;
         let p2 = &self.nodes[pindex[2] as usize].point;
-        let x = p0[0] + p1[0] + p2[0];
-        let y = p0[1] + p1[1] + p2[1];
-        let z = p0[2] + p1[2] + p2[2];
+        let x = p0.x + p1.x + p2.x;
+        let y = p0.y + p1.y + p2.y;
+        let z = p0.z + p1.z + p2.z;
         Vec3::new(x / 3.0, y / 3.0, z / 3.0)
     }
 

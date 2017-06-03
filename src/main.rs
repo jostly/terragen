@@ -342,7 +342,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         // SEGMENT C  (587 ms)
         st_c.start();
 
-        midpoint /= (n as f32);
+        midpoint /= n as f32;
 
         mesh_vertices.push(Point3::from(&midpoint));
         mesh_normals.push(Vector3::from(normal));

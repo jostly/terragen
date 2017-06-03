@@ -1,4 +1,3 @@
-use na::Point3;
 use rand::random;
 
 use math::Vec3;
@@ -41,13 +40,15 @@ impl Node {
     }
 }
 
+pub type Index3 = Vec3<u32>;
+
 pub struct Face {
-    pub points: Point3<u32>,
-    pub edges: Point3<u32>,
+    pub points: Index3,
+    pub edges: Index3,
 }
 
 impl Face {
-    pub fn new(points: Point3<u32>, edges: Point3<u32>) -> Face {
+    pub fn new(points: Index3, edges: Index3) -> Face {
         Face {
             points: points,
             edges: edges,
@@ -118,26 +119,26 @@ impl Terrain {
                          Edge::new(8, 9),
                          Edge::new(10, 11)];
 
-        let faces = vec![Face::new(Point3::new(0, 8, 1), Point3::new(3, 7, 0)),
-                         Face::new(Point3::new(0, 5, 4), Point3::new(2, 18, 1)),
-                         Face::new(Point3::new(0, 10, 5), Point3::new(4, 21, 2)),
-                         Face::new(Point3::new(0, 4, 8), Point3::new(1, 19, 3)),
-                         Face::new(Point3::new(0, 1, 10), Point3::new(0, 8, 4)),
-                         Face::new(Point3::new(1, 8, 6), Point3::new(7, 24, 5)),
-                         Face::new(Point3::new(1, 6, 7), Point3::new(5, 23, 6)),
-                         Face::new(Point3::new(1, 7, 10), Point3::new(6, 26, 8)),
-                         Face::new(Point3::new(2, 11, 3), Point3::new(13, 17, 9)),
-                         Face::new(Point3::new(2, 9, 4), Point3::new(12, 20, 10)),
-                         Face::new(Point3::new(2, 4, 5), Point3::new(10, 18, 11)),
-                         Face::new(Point3::new(2, 3, 9), Point3::new(9, 16, 12)),
-                         Face::new(Point3::new(2, 5, 11), Point3::new(11, 22, 13)),
-                         Face::new(Point3::new(3, 7, 6), Point3::new(15, 23, 14)),
-                         Face::new(Point3::new(3, 11, 7), Point3::new(17, 27, 15)),
-                         Face::new(Point3::new(3, 6, 9), Point3::new(14, 25, 16)),
-                         Face::new(Point3::new(4, 9, 8), Point3::new(20, 28, 19)),
-                         Face::new(Point3::new(5, 10, 11), Point3::new(21, 29, 22)),
-                         Face::new(Point3::new(6, 8, 9), Point3::new(24, 28, 25)),
-                         Face::new(Point3::new(7, 11, 10), Point3::new(27, 29, 26))];
+        let faces = vec![Face::new(Index3::new(0, 8, 1), Index3::new(3, 7, 0)),
+                         Face::new(Index3::new(0, 5, 4), Index3::new(2, 18, 1)),
+                         Face::new(Index3::new(0, 10, 5), Index3::new(4, 21, 2)),
+                         Face::new(Index3::new(0, 4, 8), Index3::new(1, 19, 3)),
+                         Face::new(Index3::new(0, 1, 10), Index3::new(0, 8, 4)),
+                         Face::new(Index3::new(1, 8, 6), Index3::new(7, 24, 5)),
+                         Face::new(Index3::new(1, 6, 7), Index3::new(5, 23, 6)),
+                         Face::new(Index3::new(1, 7, 10), Index3::new(6, 26, 8)),
+                         Face::new(Index3::new(2, 11, 3), Index3::new(13, 17, 9)),
+                         Face::new(Index3::new(2, 9, 4), Index3::new(12, 20, 10)),
+                         Face::new(Index3::new(2, 4, 5), Index3::new(10, 18, 11)),
+                         Face::new(Index3::new(2, 3, 9), Index3::new(9, 16, 12)),
+                         Face::new(Index3::new(2, 5, 11), Index3::new(11, 22, 13)),
+                         Face::new(Index3::new(3, 7, 6), Index3::new(15, 23, 14)),
+                         Face::new(Index3::new(3, 11, 7), Index3::new(17, 27, 15)),
+                         Face::new(Index3::new(3, 6, 9), Index3::new(14, 25, 16)),
+                         Face::new(Index3::new(4, 9, 8), Index3::new(20, 28, 19)),
+                         Face::new(Index3::new(5, 10, 11), Index3::new(21, 29, 22)),
+                         Face::new(Index3::new(6, 8, 9), Index3::new(24, 28, 25)),
+                         Face::new(Index3::new(7, 11, 10), Index3::new(27, 29, 26))];
 
         Terrain {
             nodes: nodes,
@@ -155,9 +156,9 @@ impl Terrain {
 
     pub fn face_midpoint(&self, face: &Face) -> Vertex {
         let pindex = &face.points;
-        let p0 = &self.nodes[pindex[0] as usize].point;
-        let p1 = &self.nodes[pindex[1] as usize].point;
-        let p2 = &self.nodes[pindex[2] as usize].point;
+        let p0 = &self.nodes[pindex.x as usize].point;
+        let p1 = &self.nodes[pindex.y as usize].point;
+        let p2 = &self.nodes[pindex.z as usize].point;
         let x = p0.x + p1.x + p2.x;
         let y = p0.y + p1.y + p2.y;
         let z = p0.z + p1.z + p2.z;
@@ -231,14 +232,14 @@ impl Terrain {
             };
 
             for f in self.faces.iter() {
-                let p0 = f.points[0];
-                let p1 = f.points[1];
-                let p2 = f.points[2];
+                let p0 = f.points.x;
+                let p1 = f.points.y;
+                let p2 = f.points.z;
                 debug!("Treating face ({}, {}, {})", p0, p1, p2);
 
-                let e0 = f.edges[0];
-                let e1 = f.edges[1];
-                let e2 = f.edges[2];
+                let e0 = f.edges.x;
+                let e1 = f.edges.y;
+                let e2 = f.edges.z;
 
                 let n0 = first_new_vertex + e0;
                 let n1 = first_new_vertex + e1;
@@ -257,10 +258,10 @@ impl Terrain {
                 let ne1 = find_edge(n1, n2);
                 let ne2 = find_edge(n2, n0);
 
-                new_faces.push(Face::new(Point3::new(p0, n0, n2), Point3::new(e00, ne2, e21)));
-                new_faces.push(Face::new(Point3::new(n0, p1, n1), Point3::new(e01, e10, ne0)));
-                new_faces.push(Face::new(Point3::new(p2, n2, n1), Point3::new(e20, ne1, e11)));
-                new_faces.push(Face::new(Point3::new(n0, n1, n2), Point3::new(ne0, ne1, ne2)));
+                new_faces.push(Face::new(Index3::new(p0, n0, n2), Index3::new(e00, ne2, e21)));
+                new_faces.push(Face::new(Index3::new(n0, p1, n1), Index3::new(e01, e10, ne0)));
+                new_faces.push(Face::new(Index3::new(p2, n2, n1), Index3::new(e20, ne1, e11)));
+                new_faces.push(Face::new(Index3::new(n0, n1, n2), Index3::new(ne0, ne1, ne2)));
 
             }
         }
@@ -316,8 +317,8 @@ mod tests {
         }
 
         for e in terr.edges.iter() {
-            let p0 = e[0] as usize;
-            let p1 = e[1] as usize;
+            let p0 = e.a as usize;
+            let p1 = e.b as usize;
             assert!(p0 != p1, "Illegal edge between {} and {}", p0, p1);
             seen_nodes[p0] += 1;
             seen_nodes[p1] += 1;
@@ -334,30 +335,21 @@ mod tests {
 
     fn verify_face_to_edge_link(terr: &Terrain) {
         for (i, f) in terr.faces.iter().enumerate() {
-            let p0 = f.points[0];
-            let p1 = f.points[1];
-            let p2 = f.points[2];
+            let p0 = f.points.x;
+            let p1 = f.points.y;
+            let p2 = f.points.z;
 
-            let e0 = terr.edges[f.edges[0] as usize];
-            let e1 = terr.edges[f.edges[1] as usize];
-            let e2 = terr.edges[f.edges[2] as usize];
+            let ref e0 = terr.edges[f.edges.x as usize];
+            let ref e1 = terr.edges[f.edges.y as usize];
+            let ref e2 = terr.edges[f.edges.z as usize];
 
             let (e0_0, e0_1) = if p0 <= p1 { (p0, p1) } else { (p1, p0) };
             let (e1_0, e1_1) = if p1 <= p2 { (p1, p2) } else { (p2, p1) };
             let (e2_0, e2_1) = if p2 <= p0 { (p2, p0) } else { (p0, p2) };
 
-            assert_eq!((e0_0, e0_1),
-                       (e0[0], e0[1]),
-                       "Edge 0 of face {} mismatch",
-                       i);
-            assert_eq!((e1_0, e1_1),
-                       (e1[0], e1[1]),
-                       "Edge 1 of face {} mismatch",
-                       i);
-            assert_eq!((e2_0, e2_1),
-                       (e2[0], e2[1]),
-                       "Edge 2 of face {} mismatch",
-                       i);
+            assert_eq!((e0_0, e0_1), (e0.a, e0.b), "Edge 0 of face {} mismatch", i);
+            assert_eq!((e1_0, e1_1), (e1.a, e1.b), "Edge 1 of face {} mismatch", i);
+            assert_eq!((e2_0, e2_1), (e2.a, e2.b), "Edge 2 of face {} mismatch", i);
 
         }
     }

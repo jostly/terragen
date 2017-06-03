@@ -33,7 +33,7 @@ fn main() {
     env_logger::init().unwrap();
 
     let mut ico = Terrain::new();
-    for _ in 0..7 {
+    for _ in 0..6 {
         ico.subdivide();
     }
 
@@ -59,7 +59,7 @@ fn main() {
                     let mut sw = Stopwatch::start_new();
                     ico.subdivide();
                     println!("Subdivision took {}ms", sw.elapsed_ms());
-                    // (2099 ms, lvl 6), (8685 ms, lvl 7)
+                    // (1744 ms, lvl 6), (7401 ms, lvl 7)
                     sw.restart();
                     let mesh = generate_dual(&ico);
                     println!("Generating mesh took {}ms", sw.elapsed_ms());
@@ -196,14 +196,15 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         }
 
         for (i, face) in terr.faces.iter().enumerate() {
-            for v in face.points.iter() {
-                node_to_faces[*v as usize].push(i);
-            }
+            let fp = &face.points;
+            node_to_faces[fp.x as usize].push(i);
+            node_to_faces[fp.y as usize].push(i);
+            node_to_faces[fp.z as usize].push(i);
         }
         node_to_faces
     };
 
-    println!("  Built node -> face index @ {} ms", sw.elapsed_ms()); // (209 ms)
+    println!("  Built node -> face index @ {} ms", sw.elapsed_ms()); // (142 ms)
 
     // Build map of node index -> edges
     let node_to_edges = {
@@ -219,7 +220,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         node_to_edges
     };
 
-    println!("  Built node -> edge index @ {} ms", sw.elapsed_ms()); // (360 ms)
+    println!("  Built node -> edge index @ {} ms", sw.elapsed_ms()); // (289 ms)
 
     // Build map of edge index -> faces
     let edge_to_faces = {
@@ -229,14 +230,15 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         }
 
         for (i, face) in terr.faces.iter().enumerate() {
-            for v in face.edges.iter() {
-                edge_to_faces[*v as usize].push(i);
-            }
+            let fv = &face.edges;
+            edge_to_faces[fv.x as usize].push(i);
+            edge_to_faces[fv.y as usize].push(i);
+            edge_to_faces[fv.z as usize].push(i);
         }
         edge_to_faces
     };
 
-    println!("  Built edge -> face index @ {} ms", sw.elapsed_ms()); // (624 ms)
+    println!("  Built edge -> face index @ {} ms", sw.elapsed_ms()); // (483 ms)
 
     let face_midpoints = {
         let mut face_midpoints = Vec::with_capacity(num_faces);
@@ -246,7 +248,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         face_midpoints
     };
 
-    println!("  Built midpoint registry @ {} ms", sw.elapsed_ms()); // (862 ms)
+    println!("  Built midpoint registry @ {} ms", sw.elapsed_ms()); // (554 ms)
 
     let mut st_a = Stopwatch::new();
     let mut st_b = Stopwatch::new();
@@ -282,7 +284,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         let mut midpoint = Vec3::new(0.0f32, 0.0, 0.0);
 
         st_a.stop();
-        // SEGMENT B  (2604 ms)
+        // SEGMENT B  (2192 ms)
         st_b.start();
 
         loop {
@@ -299,20 +301,19 @@ fn generate_dual(terr: &Terrain) -> Mesh {
             n += 1;
 
             st_b_1.stop();
-            // SEGMENT B:2  (533 ms)
+            // SEGMENT B:2  (98 ms)
             st_b_2.start();
 
             let face = &terr.faces[this_face_idx];
 
-            let other_point_idx = if face.points[0] == i as u32 {
-                2
-            } else if face.points[1] == i as u32 {
-                0
+            let other_point = if face.points.x == i as u32 {
+                face.points.z
+            } else if face.points.y == i as u32 {
+                face.points.x
             } else {
-                1
+                face.points.y
             };
 
-            let other_point = face.points[other_point_idx];
             // Find the edge
             let (e0, e1) = if i as u32 <= other_point {
                 (i as u32, other_point)
@@ -370,7 +371,7 @@ fn generate_dual(terr: &Terrain) -> Mesh {
         st_c.stop();
     }
 
-    println!("  Generated mesh in {} ms", sw.elapsed_ms()); // (3353 ms)
+    println!("  Generated mesh in {} ms", sw.elapsed_ms()); // (2944 ms)
     println!("    Segment A: {} ms", st_a.elapsed_ms());
     println!("    Segment B: {} ms", st_b.elapsed_ms());
     println!("      Segment B:0: {} ms", st_b_0.elapsed_ms());

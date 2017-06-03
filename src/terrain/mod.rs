@@ -6,7 +6,7 @@ use math::Vec3;
 use std::f32;
 use std::collections::HashMap;
 
-pub type Vertex = Vec3;
+pub type Vertex = Vec3<f32>;
 
 pub struct Edge<V = u32> {
     pub a: V,
@@ -153,7 +153,7 @@ impl Terrain {
         self.level
     }
 
-    pub fn face_midpoint(&self, face: &Face) -> Vec3 {
+    pub fn face_midpoint(&self, face: &Face) -> Vertex {
         let pindex = &face.points;
         let p0 = &self.nodes[pindex[0] as usize].point;
         let p1 = &self.nodes[pindex[1] as usize].point;

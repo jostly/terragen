@@ -58,7 +58,8 @@ fn main() {
                     window.remove(&mut c);
                     let mut sw = Stopwatch::start_new();
                     ico.subdivide();
-                    println!("Subdivision took {}ms", sw.elapsed_ms()); // (2099 ms) (lvl 6)
+                    println!("Subdivision took {}ms", sw.elapsed_ms());
+                    // (2099 ms, lvl 6), (8685 ms, lvl 7)
                     sw.restart();
                     let mesh = generate_dual(&ico);
                     println!("Generating mesh took {}ms", sw.elapsed_ms());
@@ -81,6 +82,18 @@ fn add_mesh(parent: &mut SceneNode, mesh: Mesh) -> SceneNode {
     c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");
 
     c
+}
+
+impl<'a> From<&'a Vec3<f32>> for Vector3<f32> {
+    fn from(v: &'a Vec3<f32>) -> Self {
+        Vector3::new(v.x, v.y, v.z)
+    }
+}
+
+impl<'a> From<&'a Vec3<f32>> for Point3<f32> {
+    fn from(v: &'a Vec3<f32>) -> Self {
+        Point3::new(v.x, v.y, v.z)
+    }
 }
 
 /*

@@ -7,22 +7,21 @@ use std::collections::HashMap;
 
 pub type Vertex = Vec3<f32>;
 
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub struct Edge<V = u32> {
     pub a: V,
     pub b: V,
 }
 
-impl<V> Edge<V> {
+impl<V> Edge<V>
+    where V: PartialOrd
+{
     pub fn new(a: V, b: V) -> Edge<V> {
-        Edge { a: a, b: b }
-    }
-}
-
-fn make_edge(a: u32, b: u32) -> Edge {
-    if a > b {
-        Edge::new(b, a)
-    } else {
-        Edge::new(a, b)
+        if a <= b {
+            Edge { a: a, b: b }
+        } else {
+            Edge { a: b, b: a }
+        }
     }
 }
 
@@ -203,13 +202,13 @@ impl Terrain {
             self.nodes.push(Node::new(midpoint.normal(), elevation));
 
             debug!("Splitting edge ({}, {})", e.a, e.b);
-            let e0 = make_edge(e.a, vidx);
-            let e1 = make_edge(e.b, vidx);
+            let e0 = Edge::new(e.a, vidx);
+            let e1 = Edge::new(e.b, vidx);
             debug!("Generated edge ({}, {})", e.a, vidx);
-            edge_index.insert((e.a, vidx), new_edges.len() as u32);
+            edge_index.insert(Edge::new(e.a, vidx), new_edges.len() as u32);
             new_edges.push(e0);
             debug!("Generated edge ({}, {})", e.b, vidx);
-            edge_index.insert((e.b, vidx), new_edges.len() as u32);
+            edge_index.insert(Edge::new(e.b, vidx), new_edges.len() as u32);
             new_edges.push(e1);
         }
 
@@ -217,15 +216,12 @@ impl Terrain {
 
         {
             let mut find_edge = |a: u32, b: u32| -> u32 {
-                let key = if a <= b { (a, b) } else { (b, a) };
+                let key = Edge::new(a, b);
                 match edge_index.get(&key) {
                     Some(idx) => *idx,
                     None => {
-                        debug!("Failed to find edge for {:?}", key);
-                        let e = make_edge(a, b);
                         let idx = new_edges.len() as u32;
-                        //edge_index.insert((e[0], e[1]), idx);
-                        new_edges.push(e);
+                        new_edges.push(key);
                         idx
                     }
                 }

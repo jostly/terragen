@@ -63,6 +63,7 @@ fn main() {
                     sw.restart();
                     let mesh = generate_dual(&ico);
                     println!("Generating mesh took {}ms", sw.elapsed_ms());
+                    // (3568 ms, lvl 6)
                     sw.restart();
                     c = add_mesh(&mut grp, mesh);
                     println!("Adding mesh took {}ms", sw.elapsed_ms());

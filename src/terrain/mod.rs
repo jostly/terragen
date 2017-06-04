@@ -7,7 +7,7 @@ use std::collections::HashMap;
 
 pub type Vertex = Vec3<f32>;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub struct Edge<V = u32> {
     pub a: V,
     pub b: V,
@@ -25,6 +25,7 @@ impl<V> Edge<V>
     }
 }
 
+#[derive(Clone)]
 pub struct Node {
     pub point: Vertex,
     pub elevation: f32,
@@ -41,6 +42,7 @@ impl Node {
 
 pub type Index3 = Vec3<u32>;
 
+#[derive(Clone)]
 pub struct Face {
     pub points: Index3,
     pub edges: Index3,
@@ -55,6 +57,7 @@ impl Face {
     }
 }
 
+#[derive(Clone)]
 pub struct Terrain {
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,

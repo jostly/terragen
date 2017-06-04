@@ -28,14 +28,19 @@ use geom::*;
 use std::rc::Rc;
 use std::cell::RefCell;
 use std::path::Path;
+use std::sync::mpsc::channel;
 
 fn main() {
 
     env_logger::init().unwrap();
 
-    let mut ico = Terrain::new();
+    let (tx, rx) = channel();
+
+    let mut terrain = Some(Terrain::new());
     for _ in 0..6 {
-        ico.subdivide();
+        if let Some(ref mut ico) = terrain {
+            ico.subdivide();
+        }
     }
 
     let mut window = Window::new("Terragen");
@@ -49,34 +54,35 @@ fn main() {
     let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.001);
 
     let mut grp = window.add_group();
-    let mut c = add_mesh(&mut grp, generate_dual(&ico));
+    let mut terrain_node: Option<SceneNode> = None;
 
-    let genfuns: [fn(&Terrain) -> Mesh; 2] = [generate_dual, generate_regular];
-    let mut genfunidx = 0;
-    let mut regenerate_mesh = false;
+    let mut generator = Generator::Dual;
+    let mut regenerate_mesh = true;
 
     while window.render_with_camera(&mut arc_ball) {
         for mut event in window.events().iter() {
             match event.value {
                 WindowEvent::Key(Key::Space, _, Action::Release, _) => {
-                    println!("Subdividing a level {} terrain", ico.current_level());
-                    let sw = Stopwatch::start_new();
-                    ico.subdivide();
-                    println!("Subdivision took {}ms", sw.elapsed_ms());
-                    // (1744 ms, lvl 6), (7401 ms, lvl 7)
-                    regenerate_mesh = true;
-                    event.inhibited = true
+                    if let Some(ref mut ico) = terrain {
+                        println!("Subdividing a level {} terrain", ico.current_level());
+                        let sw = Stopwatch::start_new();
+                        ico.subdivide();
+                        println!("Subdivision took {}ms", sw.elapsed_ms());
+                        // (1744 ms, lvl 6), (7401 ms, lvl 7)
+                        regenerate_mesh = true;
+                        event.inhibited = true
+                    }
                 }
                 WindowEvent::Key(Key::D, _, Action::Release, _) => {
-                    if genfunidx == 1 {
-                        genfunidx = 0;
+                    if generator == Generator::Regular {
+                        generator = Generator::Dual;
                         regenerate_mesh = true;
                     }
                     event.inhibited = true
                 }
                 WindowEvent::Key(Key::R, _, Action::Release, _) => {
-                    if genfunidx == 0 {
-                        genfunidx = 1;
+                    if generator == Generator::Dual {
+                        generator = Generator::Regular;
                         regenerate_mesh = true;
                     }
                     event.inhibited = true
@@ -85,15 +91,23 @@ fn main() {
             }
         }
         if regenerate_mesh {
-            window.remove(&mut c);
-            let mut sw = Stopwatch::start_new();
-            let mesh = genfuns[genfunidx](&ico);
-            println!("Generating mesh took {}ms", sw.elapsed_ms());
-            // (3568 ms, lvl 6)
-            sw.restart();
-            c = add_mesh(&mut grp, mesh);
-            println!("Adding mesh took {}ms", sw.elapsed_ms());
+            if let Some(ico) = terrain {
+                generate(generator, ico, &tx);
+                terrain = None;
+            }
             regenerate_mesh = false;
+        }
+        match rx.try_recv() {
+            Ok(Message::Complete(vertices, faces, normals, texcoords, terr)) => {
+                if let Some(mut c) = terrain_node {
+                    window.remove(&mut c);
+                }
+                terrain_node =
+                    Some(add_mesh(&mut grp,
+                                  Mesh::new(vertices, faces, normals, texcoords, false)));
+                terrain = Some(terr);
+            }
+            _ => {}
         }
         grp.prepend_to_local_rotation(&rot);
     }

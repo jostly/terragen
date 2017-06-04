@@ -1,8 +1,10 @@
 use math::Vec3;
 use terrain::Terrain;
 use na::{Vector3, Point3, Point2};
-use kiss3d::resource::Mesh;
 use stopwatch::Stopwatch;
+
+use std::sync::mpsc::Sender;
+use std::thread;
 
 impl<'a> From<&'a Vec3<f32>> for Vector3<f32> {
     fn from(v: &'a Vec3<f32>) -> Self {
@@ -16,36 +18,70 @@ impl<'a> From<&'a Vec3<f32>> for Point3<f32> {
     }
 }
 
-pub fn generate_regular(ico: &Terrain) -> Mesh {
-    let ico_faces = &ico.faces;
-    let ico_vertices = &ico.nodes;
-    let num_vertices = ico_faces.len() * 3;
+pub enum Message {
+    InProgress(f32),
+    Complete(Vec<Point3<f32>>,
+             Vec<Point3<u32>>,
+             Option<Vec<Vector3<f32>>>,
+             Option<Vec<Point2<f32>>>,
+             Terrain),
+}
+
+#[derive(PartialEq, Eq, Debug, Copy, Clone)]
+pub enum Generator {
+    Regular,
+    Dual,
+}
+
+pub fn generate(generator: Generator, terrain: Terrain, tx: &Sender<Message>) {
+    let channel = tx.clone();
+    thread::spawn(move || {
+        let mut sw = Stopwatch::start_new();
+        let mess = match generator {
+            Generator::Regular => generate_regular(terrain),
+            Generator::Dual => generate_dual(terrain),
+        };
+        println!("Generating mesh took {} ms", sw.elapsed_ms());
+        // (3568 ms, lvl 6)
+
+        channel.send(mess).unwrap();
+    });
+}
+
+fn generate_regular(ico: Terrain) -> Message {
+    let num_faces = ico.faces.len();
+    let num_vertices = num_faces * 3;
     let (min_elev, max_elev) = ico.calculate_elevations();
     let elev_scale = max_elev - min_elev;
     let mut vertices = Vec::with_capacity(num_vertices);
     let mut normals = Vec::with_capacity(num_vertices);
     let mut texcoords = Vec::with_capacity(num_vertices);
-    let mut faces = Vec::with_capacity(ico_faces.len());
+    let mut faces = Vec::with_capacity(num_faces);
 
-    let mut vert_index = 0u32;
-    for f in ico_faces.iter() {
-        for idx in [f.points.x, f.points.y, f.points.z].iter() {
-            let ref vert = ico_vertices[*idx as usize];
-            let elevation = (vert.elevation - min_elev) / elev_scale;
-            //let vertex_scale = (elevation.powi(2) - 0.5) * 0.02;
-            let vertex = vert.point; // * (1.0 + vertex_scale);
+    {
+        let ico_faces = &ico.faces;
+        let ico_vertices = &ico.nodes;
 
-            vertices.push(Point3::from(&vertex));
-            let normal = ico.face_midpoint(f).normal();
-            normals.push(Vector3::from(&normal));
-            let uv = Point2::new(1.0 - elevation.powf(1.5), 0.0);
-            texcoords.push(uv);
+        let mut vert_index = 0u32;
+        for f in ico_faces.iter() {
+            for idx in [f.points.x, f.points.y, f.points.z].iter() {
+                let ref vert = ico_vertices[*idx as usize];
+                let elevation = (vert.elevation - min_elev) / elev_scale;
+                //let vertex_scale = (elevation.powi(2) - 0.5) * 0.02;
+                let vertex = vert.point; // * (1.0 + vertex_scale);
+
+                vertices.push(Point3::from(&vertex));
+                let normal = ico.face_midpoint(f).normal();
+                normals.push(Vector3::from(&normal));
+                let uv = Point2::new(1.0 - elevation.powf(1.5), 0.0);
+                texcoords.push(uv);
+            }
+            faces.push(Point3::new(vert_index, vert_index + 1, vert_index + 2));
+            vert_index += 3;
         }
-        faces.push(Point3::new(vert_index, vert_index + 1, vert_index + 2));
-        vert_index += 3;
     }
 
-    Mesh::new(vertices, faces, Some(normals), Some(texcoords), false)
+    Message::Complete(vertices, faces, Some(normals), Some(texcoords), ico)
 }
 /*
 
@@ -72,7 +108,7 @@ pub fn generate_regular(ico: &Terrain) -> Mesh {
 
  */
 
-pub fn generate_dual(terr: &Terrain) -> Mesh {
+fn generate_dual(terr: Terrain) -> Message {
     println!("  Generator started...");
     let mut sw = Stopwatch::start_new();
 
@@ -312,11 +348,11 @@ pub fn generate_dual(terr: &Terrain) -> Mesh {
              mesh_texcoords.capacity());
 
     sw.restart();
-    let r = Mesh::new(mesh_vertices,
-                      mesh_faces,
-                      Some(mesh_normals),
-                      Some(mesh_texcoords),
-                      false);
+    let r = Message::Complete(mesh_vertices,
+                              mesh_faces,
+                              Some(mesh_normals),
+                              Some(mesh_texcoords),
+                              terr);
 
     println!("  Creating mesh object in {} ms", sw.elapsed_ms());
 

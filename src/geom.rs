@@ -1,4 +1,4 @@
-use math::Vec3;
+use math::{Vec3, normalize};
 use terrain::Terrain;
 use na::{Vector3, Point3, Point2};
 use stopwatch::Stopwatch;
@@ -19,7 +19,6 @@ impl<'a> From<&'a Vec3<f32>> for Point3<f32> {
 }
 
 pub enum Message {
-    InProgress(f32),
     Complete(Vec<Point3<f32>>,
              Vec<Point3<u32>>,
              Option<Vec<Vector3<f32>>>,
@@ -36,7 +35,7 @@ pub enum Generator {
 pub fn generate(generator: Generator, terrain: Terrain, tx: &Sender<Message>) {
     let channel = tx.clone();
     thread::spawn(move || {
-        let mut sw = Stopwatch::start_new();
+        let sw = Stopwatch::start_new();
         let mess = match generator {
             Generator::Regular => generate_regular(terrain),
             Generator::Dual => generate_dual(terrain),
@@ -68,10 +67,10 @@ fn generate_regular(ico: Terrain) -> Message {
                 let ref vert = ico_vertices[*idx as usize];
                 let elevation = (vert.elevation - min_elev) / elev_scale;
                 //let vertex_scale = (elevation.powi(2) - 0.5) * 0.02;
-                let vertex = vert.point; // * (1.0 + vertex_scale);
+                let vertex = &vert.point; // * (1.0 + vertex_scale);
 
-                vertices.push(Point3::from(&vertex));
-                let normal = ico.face_midpoint(f).normal();
+                vertices.push(Point3::from(vertex));
+                let normal = normalize(ico.face_midpoint(f));
                 normals.push(Vector3::from(&normal));
                 let uv = Point2::new(1.0 - elevation.powf(1.5), 0.0);
                 texcoords.push(uv);
@@ -241,7 +240,7 @@ fn generate_dual(terr: Terrain) -> Message {
         st_b.start();
 
         loop {
-            let face_mid = face_midpoints[this_face_idx];
+            let face_mid = &face_midpoints[this_face_idx];
             // SEGMENT B:0  (36 ms)
             st_b_0.start();
             midpoint += face_mid;
@@ -249,7 +248,7 @@ fn generate_dual(terr: Terrain) -> Message {
             // SEGMENT B:1  (1099 ms)
             st_b_1.start();
             mesh_texcoords.push(uv.clone());
-            mesh_vertices.push(Point3::from(&face_mid));
+            mesh_vertices.push(Point3::from(face_mid));
             mesh_normals.push(Vector3::from(normal));
             n += 1;
 

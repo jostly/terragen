@@ -1,6 +1,6 @@
 use rand::random;
 
-use math::Vec3;
+use math::{Vec3, normalize};
 
 use std::f32;
 use std::collections::HashMap;
@@ -196,13 +196,13 @@ impl Terrain {
             let (midpoint, elevation) = {
                 let p0 = &self.nodes[e.a as usize];
                 let p1 = &self.nodes[e.b as usize];
-                let delta = p1.point - p0.point;
+                let delta = &p1.point - &p0.point;
                 let e = (p1.elevation + p0.elevation) / 2.0;
-                ((p0.point + delta * 0.5), e + (random::<f32>() - 0.5) * self.rnd_pow)
+                ((&p0.point + delta * 0.5), e + (random::<f32>() - 0.5) * self.rnd_pow)
             };
 
             let vidx = self.nodes.len() as u32;
-            self.nodes.push(Node::new(midpoint.normal(), elevation));
+            self.nodes.push(Node::new(normalize(midpoint), elevation));
 
             debug!("Splitting edge ({}, {})", e.a, e.b);
             let e0 = Edge::new(e.a, vidx);

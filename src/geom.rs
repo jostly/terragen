@@ -23,6 +23,7 @@ pub enum Message {
              Vec<Point3<u32>>,
              Option<Vec<Vector3<f32>>>,
              Option<Vec<Point2<f32>>>,
+             Option<Vec<Point3<u32>>>,
              Terrain),
 }
 
@@ -32,13 +33,16 @@ pub enum Generator {
     Dual,
 }
 
-pub fn generate(generator: Generator, terrain: Terrain, tx: &Sender<Message>) {
+pub fn generate(generator: Generator,
+                terrain: Terrain,
+                generate_wireframe: bool,
+                tx: &Sender<Message>) {
     let channel = tx.clone();
     thread::spawn(move || {
         let sw = Stopwatch::start_new();
         let mess = match generator {
-            Generator::Regular => generate_regular(terrain),
-            Generator::Dual => generate_dual(terrain),
+            Generator::Regular => generate_regular(terrain, generate_wireframe),
+            Generator::Dual => generate_dual(terrain, generate_wireframe),
         };
         println!("Generating mesh took {} ms", sw.elapsed_ms());
         // (3568 ms, lvl 6)
@@ -47,7 +51,7 @@ pub fn generate(generator: Generator, terrain: Terrain, tx: &Sender<Message>) {
     });
 }
 
-fn generate_regular(ico: Terrain) -> Message {
+fn generate_regular(ico: Terrain, generate_wireframe: bool) -> Message {
     let num_faces = ico.faces.len();
     let num_vertices = num_faces * 3;
     let (min_elev, max_elev) = ico.calculate_elevations();
@@ -56,6 +60,11 @@ fn generate_regular(ico: Terrain) -> Message {
     let mut normals = Vec::with_capacity(num_vertices);
     let mut texcoords = Vec::with_capacity(num_vertices);
     let mut faces = Vec::with_capacity(num_faces);
+    let mut wireframes = if generate_wireframe {
+        Vec::with_capacity(num_faces * 2)
+    } else {
+        Vec::new()
+    };
 
     {
         let ico_faces = &ico.faces;
@@ -76,11 +85,24 @@ fn generate_regular(ico: Terrain) -> Message {
                 texcoords.push(uv);
             }
             faces.push(Point3::new(vert_index, vert_index + 1, vert_index + 2));
+            if generate_wireframe {
+                wireframes.push(Point3::new(vert_index, vert_index + 1, vert_index + 1));
+                wireframes.push(Point3::new(vert_index + 2, vert_index + 2, vert_index));
+            }
             vert_index += 3;
         }
     }
 
-    Message::Complete(vertices, faces, Some(normals), Some(texcoords), ico)
+    Message::Complete(vertices,
+                      faces,
+                      Some(normals),
+                      Some(texcoords),
+                      if generate_wireframe {
+                          Some(wireframes)
+                      } else {
+                          None
+                      },
+                      ico)
 }
 /*
 
@@ -107,7 +129,7 @@ fn generate_regular(ico: Terrain) -> Message {
 
  */
 
-fn generate_dual(terr: Terrain) -> Message {
+fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
     println!("  Generator started...");
     let mut sw = Stopwatch::start_new();
 
@@ -119,6 +141,7 @@ fn generate_dual(terr: Terrain) -> Message {
     let mut mesh_vertices = Vec::with_capacity(num_nodes * 7 - 12);
     let mut mesh_normals = Vec::with_capacity(mesh_vertices.capacity());
     let mut mesh_texcoords = Vec::with_capacity(mesh_vertices.capacity());
+    let mut wireframes = Vec::new();
 
     println!("    Capacity mesh_faces:     {} / {}",
              mesh_faces.len(),
@@ -318,6 +341,10 @@ fn generate_dual(terr: Terrain) -> Message {
             let p1 = j;
             let p2 = (j + 1) % n;
             mesh_faces.push(Point3::new(center, curr_vertex + p1, curr_vertex + p2));
+            if generate_wireframe {
+                wireframes.push(curr_vertex + p1);
+                wireframes.push(curr_vertex + p2);
+            }
         }
 
         st_c.stop();
@@ -351,9 +378,37 @@ fn generate_dual(terr: Terrain) -> Message {
                               mesh_faces,
                               Some(mesh_normals),
                               Some(mesh_texcoords),
+                              encode_wireframes(&wireframes),
                               terr);
 
     println!("  Creating mesh object in {} ms", sw.elapsed_ms());
 
     r
+}
+
+fn encode_wireframes(wireframes: &Vec<u32>) -> Option<Vec<Point3<u32>>> {
+    let num_points = wireframes.len();
+    if num_points == 0 {
+        None
+    } else {
+        let mut encoded = Vec::with_capacity(num_points / 3 + 1);
+        let mut i = 0;
+        while i < num_points - 3 {
+            let tri = Point3::new(wireframes[i], wireframes[i + 1], wireframes[i + 2]);
+            encoded.push(tri);
+            i += 3;
+        }
+        match num_points - i {
+            2 => {
+                let tri = Point3::new(wireframes[i], wireframes[i + 1], 0);
+                encoded.push(tri);
+            }
+            1 => {
+                let tri = Point3::new(wireframes[i], 0, 0);
+                encoded.push(tri);
+            }
+            _ => {}
+        }
+        Some(encoded)
+    }
 }

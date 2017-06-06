@@ -180,6 +180,9 @@ impl Terrain {
     }
 
     pub fn subdivide(&mut self) {
+        fn rand(max: f32) -> f32 {
+            (random::<f32>() * 2.0 * max) - max
+        }
         self.level += 1;
         debug!("Initiating subdivision to level {}", self.level);
         let num_edges = self.edges.len();
@@ -198,7 +201,7 @@ impl Terrain {
                 let p1 = &self.nodes[e.b as usize];
                 let mid = slerp(&p0.point, &p1.point, 0.5);
                 let e = (p1.elevation + p0.elevation) / 2.0;
-                (mid, e + (random::<f32>() - 0.5) * self.rnd_pow)
+                (mid, e + rand(0.5) * self.rnd_pow)
             };
 
             let vidx = self.nodes.len() as u32;

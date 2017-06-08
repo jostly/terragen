@@ -157,10 +157,10 @@ impl Terrain {
             let e0 = Edge::new(e.a, vidx);
             let e1 = Edge::new(e.b, vidx);
             debug!("Generated edge ({}, {})", e.a, vidx);
-            edge_index.insert(Edge::new(e.a, vidx), new_edges.len() as u32);
+            edge_index.insert((e.a, vidx), new_edges.len() as u32);
             new_edges.push(e0);
             debug!("Generated edge ({}, {})", e.b, vidx);
-            edge_index.insert(Edge::new(e.b, vidx), new_edges.len() as u32);
+            edge_index.insert((e.b, vidx), new_edges.len() as u32);
             new_edges.push(e1);
         }
 
@@ -168,12 +168,12 @@ impl Terrain {
 
         {
             let mut find_edge = |a: u32, b: u32| -> u32 {
-                let key = Edge::new(a, b);
+                let key = if a <= b { (a, b) } else { (b, a) };
                 match edge_index.get(&key) {
                     Some(idx) => *idx,
                     None => {
                         let idx = new_edges.len() as u32;
-                        new_edges.push(key);
+                        new_edges.push(Edge::new(a, b));
                         idx
                     }
                 }

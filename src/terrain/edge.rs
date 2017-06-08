@@ -1,13 +1,11 @@
-#[derive(Debug, PartialEq, Eq, Hash, Clone)]
-pub struct Edge<V = u32> {
-    pub a: V,
-    pub b: V,
+#[derive(Clone)]
+pub struct Edge {
+    pub a: u32,
+    pub b: u32,
 }
 
-impl<V> Edge<V>
-    where V: PartialOrd
-{
-    pub fn new(a: V, b: V) -> Edge<V> {
+impl Edge {
+    pub fn new(a: u32, b: u32) -> Edge {
         if a <= b {
             Edge { a: a, b: b }
         } else {

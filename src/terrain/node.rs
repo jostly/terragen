@@ -22,4 +22,9 @@ impl Node {
         self.edges.push(edge_index);
         self
     }
+
+    pub fn add_face(&mut self, face_index: u32) -> &Self {
+        self.faces.push(face_index);
+        self
+    }
 }

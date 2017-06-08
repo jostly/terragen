@@ -25,18 +25,18 @@ impl Terrain {
             random::<f32>() * 0.5
         }
 
-        let nodes = vec![Node::new(Vertex::new(z, dv, du), random_elevation()),
-                         Node::new(Vertex::new(z, dv, -du), random_elevation()),
-                         Node::new(Vertex::new(z, -dv, du), random_elevation()),
-                         Node::new(Vertex::new(z, -dv, -du), random_elevation()),
-                         Node::new(Vertex::new(du, z, dv), random_elevation()),
-                         Node::new(Vertex::new(-du, z, dv), random_elevation()),
-                         Node::new(Vertex::new(du, z, -dv), random_elevation()),
-                         Node::new(Vertex::new(-du, z, -dv), random_elevation()),
-                         Node::new(Vertex::new(dv, du, z), random_elevation()),
-                         Node::new(Vertex::new(dv, -du, z), random_elevation()),
-                         Node::new(Vertex::new(-dv, du, z), random_elevation()),
-                         Node::new(Vertex::new(-dv, -du, z), random_elevation())];
+        let mut nodes = vec![Node::new(Vertex::new(z, dv, du), random_elevation()),
+                             Node::new(Vertex::new(z, dv, -du), random_elevation()),
+                             Node::new(Vertex::new(z, -dv, du), random_elevation()),
+                             Node::new(Vertex::new(z, -dv, -du), random_elevation()),
+                             Node::new(Vertex::new(du, z, dv), random_elevation()),
+                             Node::new(Vertex::new(-du, z, dv), random_elevation()),
+                             Node::new(Vertex::new(du, z, -dv), random_elevation()),
+                             Node::new(Vertex::new(-du, z, -dv), random_elevation()),
+                             Node::new(Vertex::new(dv, du, z), random_elevation()),
+                             Node::new(Vertex::new(dv, -du, z), random_elevation()),
+                             Node::new(Vertex::new(-dv, du, z), random_elevation()),
+                             Node::new(Vertex::new(-dv, -du, z), random_elevation())];
 
         let edges = vec![Edge::new(0, 1),
                          Edge::new(0, 4),
@@ -90,6 +90,8 @@ impl Terrain {
                          Face::new(Index3::new(6, 8, 9), Index3::new(24, 28, 25)),
                          Face::new(Index3::new(7, 11, 10), Index3::new(27, 29, 26))];
 
+        Terrain::assign_edge_to_nodes(&mut nodes, &edges);
+
         Terrain {
             nodes: nodes,
             edges: edges,
@@ -98,6 +100,18 @@ impl Terrain {
             level: 0,
         }
 
+    }
+
+    fn assign_edge_to_nodes(nodes: &mut Vec<Node>, edges: &Vec<Edge>) {
+        for n in nodes.iter_mut() {
+            n.edges.clear();
+        }
+        for (idx, e) in edges.iter().enumerate() {
+            let p0 = e.a as usize;
+            let p1 = e.b as usize;
+            nodes[p0].add_edge(idx as u32);
+            nodes[p1].add_edge(idx as u32);
+        }
     }
 
     pub fn current_level(&self) -> u8 {
@@ -213,6 +227,8 @@ impl Terrain {
 
             }
         }
+
+        Terrain::assign_edge_to_nodes(&mut self.nodes, &new_edges);
 
         self.edges = new_edges;
         self.faces = new_faces;
@@ -400,25 +416,45 @@ mod tests {
 
     fn verify_edges_for_nodes(terr: &Terrain, min_edges: u32, max_edges: u32) {
         let num_nodes = terr.nodes.len();
-        let mut seen_nodes = Vec::with_capacity(num_nodes);
-        for _ in 0..num_nodes {
-            seen_nodes.push(0);
-        }
+        let mut seen_nodes = vec![Vec::new(); num_nodes];
 
-        for e in terr.edges.iter() {
+        for (idx, e) in terr.edges.iter().enumerate() {
             let p0 = e.a as usize;
             let p1 = e.b as usize;
             assert!(p0 != p1, "Illegal edge between {} and {}", p0, p1);
-            seen_nodes[p0] += 1;
-            seen_nodes[p1] += 1;
+            let edges = &terr.nodes[p0].edges;
+            assert!(edges.contains(&(idx as u32)),
+                    "Node {} does not link back to edge {} (links: {:?})",
+                    p0,
+                    idx,
+                    edges);
+            let edges = &terr.nodes[p1].edges;
+            assert!(edges.contains(&(idx as u32)),
+                    "Node {} does not link back to edge {} (links: {:?})",
+                    p1,
+                    idx,
+                    edges);
+
+            seen_nodes[p0].push(idx as u32);
+            seen_nodes[p1].push(idx as u32);
         }
 
-        for (i, n) in seen_nodes.into_iter().enumerate() {
+        for (i, mut v) in seen_nodes.into_iter().enumerate() {
+            let n = v.len() as u32;
             assert!(n > 0, "No edge leading to node {}", i);
             assert!(n >= min_edges && n <= max_edges,
-                    "Illegal number of edges leading to node {}: {}",
+                    "Illegal number of edges leading to node {}: {} (links: {:?}",
                     i,
-                    n);
+                    n,
+                    v);
+            let mut actual = terr.nodes[i].edges.clone();
+            actual.sort();
+
+            v.sort();
+            assert_eq!(actual,
+                       v,
+                       "Links mismatch for node {} (left=actual, right=expected)",
+                       i);
         }
     }
 

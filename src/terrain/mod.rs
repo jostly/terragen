@@ -302,6 +302,7 @@ impl Terrain {
     fn conditional_rotate_edge(&mut self, edge_index: usize) -> bool {
         let edge = &self.edges[edge_index];
         // TODO faces for edges let face0 = &self.faces[edge.face[0]
+        false
     }
 
     pub fn distort(&mut self) {}
@@ -435,6 +436,7 @@ mod tests {
     fn subdivided_terrain_has_edges_for_all_nodes() {
         let mut terr = Terrain::new();
         terr.subdivide();
+        terr.subdivide();
 
         verify_edges_for_nodes(&terr, 5, 6);
     }
@@ -442,6 +444,7 @@ mod tests {
     #[test]
     fn subdivided_terrain_has_correct_face_to_edge_linkage() {
         let mut terr = Terrain::new();
+        terr.subdivide();
         terr.subdivide();
 
         verify_face_to_edge_link(&terr);

@@ -92,14 +92,14 @@ impl Material for WireframeMaterial {
             mesh.bind_faces();
 
             if data.lines_width() != 0.0 {
-                verify!(gl::Disable(gl::CULL_FACE));
+                gl::Disable(gl::CULL_FACE);
                 //verify!(gl::PolygonMode(gl::FRONT_AND_BACK, gl::LINE));
                 gl::LineWidth(data.lines_width());
                 let mut pts = mesh.num_pts();
                 if pts % 2 == 1 {
                     pts -= 1;
                 }
-                verify!(gl::DrawElements(gl::LINES, pts as GLint, gl::UNSIGNED_INT, ptr::null()));
+                gl::DrawElements(gl::LINES, pts as GLint, gl::UNSIGNED_INT, ptr::null());
                 gl::LineWidth(1.0);
             }
         }

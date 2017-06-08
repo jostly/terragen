@@ -251,7 +251,8 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
         let curr_vertex = mesh_vertices.len() as u32;
 
         let elevation = (node.elevation - min_elev) / elev_scale;
-        let uv = Point2::new(1.0 - elevation.powf(1.5), 0.0);
+        let colour = 1.0 - elevation.powf(1.5);
+        let uv = Point2::new(colour.min(1.0).max(0.0), 0.0);
         mesh_texcoords.push(uv.clone());
 
         let normal = &node.point;
@@ -349,6 +350,7 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
 
         st_c.stop();
     }
+    let wireframes = encode_wireframes(&wireframes);
 
     println!("  Generated mesh in {} ms", sw.elapsed_ms()); // (2944 ms)
     println!("    Segment A: {} ms", st_a.elapsed_ms());
@@ -378,7 +380,7 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
                               mesh_faces,
                               Some(mesh_normals),
                               Some(mesh_texcoords),
-                              encode_wireframes(&wireframes),
+                              wireframes,
                               terr);
 
     println!("  Creating mesh object in {} ms", sw.elapsed_ms());

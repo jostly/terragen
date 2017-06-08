@@ -1,6 +1,6 @@
 use rand::random;
 
-use math::{Vec3, slerp};
+use math::*;
 
 use std::f32;
 use std::collections::HashMap;
@@ -180,9 +180,6 @@ impl Terrain {
     }
 
     pub fn subdivide(&mut self) {
-        fn rand(max: f32) -> f32 {
-            (random::<f32>() * 2.0 * max) - max
-        }
         self.level += 1;
         debug!("Initiating subdivision to level {}", self.level);
         let num_edges = self.edges.len();
@@ -200,6 +197,7 @@ impl Terrain {
                 let p0 = &self.nodes[e.a as usize];
                 let p1 = &self.nodes[e.b as usize];
                 let mid = slerp(&p0.point, &p1.point, 0.5);
+                //let mid = normalize(&p0.point + (&p1.point - &p0.point) / 2.0);
                 let e = (p1.elevation + p0.elevation) / 2.0;
                 (mid, e + rand(0.5) * self.rnd_pow)
             };
@@ -275,6 +273,144 @@ impl Terrain {
               self.edges.len(),
               self.faces.len());
     }
+
+    fn rotation_predicate(old_node_0: &Vertex,
+                          old_node_1: &Vertex,
+                          new_node_0: &Vertex,
+                          new_node_1: &Vertex)
+                          -> bool {
+        let old_edge_len = distance(old_node_0, old_node_1);
+        let new_edge_len = distance(new_node_0, new_node_1);
+        let ratio = old_edge_len / new_edge_len;
+        if ratio >= 2.0 || ratio <= 0.5 {
+            return false;
+        }
+        let v0 = (old_node_1 - old_node_0) / old_edge_len;
+        let v1 = normalize(new_node_0 - old_node_0);
+        let v2 = normalize(new_node_1 - old_node_0);
+        if v0.dot(v1) < 0.2 || v0.dot(v2) < 0.2 {
+            return false;
+        }
+        let v3 = normalize(new_node_0 - old_node_1);
+        let v4 = normalize(new_node_1 - old_node_1);
+        if v0.dot(v3) > -0.2 || v0.dot(v4) > -0.2 {
+            return false;
+        }
+        true
+    }
+
+    fn conditional_rotate_edge(&mut self, edge_index: usize) -> bool {
+        let edge = &self.edges[edge_index];
+        // TODO faces for edges let face0 = &self.faces[edge.face[0]
+    }
+
+    pub fn distort(&mut self) {}
+
+    pub fn relax(&mut self, multiplier: f32) -> f32 {
+        let total_surface_area = 4.0 * f32::consts::PI;
+        let ideal_face_area = total_surface_area / self.faces.len() as f32;
+        let q3 = 3.0f32.sqrt();
+        //let ideal_edge_length = (ideal_face_area * 4.0 / 3.0f32.sqrt()).sqrt();
+        //let ideal_distance_to_centroid = ideal_edge_length * 3.0f32.sqrt() / 3.0 * 0.9;
+        let ideal_distance_to_centroid = 2.0 * (q3 * ideal_face_area).sqrt() / 3.0 * 0.9;
+
+        let mut point_shifts = vec![Vec3::new(0.0f32, 0.0, 0.0); self.nodes.len()];
+
+        for face in self.faces.iter() {
+            let index0 = face.points.x as usize;
+            let index1 = face.points.y as usize;
+            let index2 = face.points.z as usize;
+
+            let n0 = &self.nodes[index0];
+            let n1 = &self.nodes[index1];
+            let n2 = &self.nodes[index2];
+
+            let p0 = &n0.point;
+            let p1 = &n1.point;
+            let p2 = &n2.point;
+
+            let centroid = normalize(p0 + p1 + p2);
+
+            let v0 = &centroid - p0;
+            let v1 = &centroid - p1;
+            let v2 = &centroid - p2;
+
+            let length0 = v0.length();
+            let length1 = v1.length();
+            let length2 = v2.length();
+
+            point_shifts[index0] += v0 *
+                                    (multiplier * (1.0 - ideal_distance_to_centroid / length0));
+            point_shifts[index1] += v1 *
+                                    (multiplier * (1.0 - ideal_distance_to_centroid / length1));
+            point_shifts[index2] += v2 *
+                                    (multiplier * (1.0 - ideal_distance_to_centroid / length2));
+        }
+
+        let origin = Vec3::new(0.0f32, 0.0, 0.0);
+
+        let mut i = 0;
+        for mut vec in point_shifts.iter_mut() {
+            let normal = &self.nodes[i].point;
+            let mut projected = vec.clone();
+            projected -= normal * vec.dot(normal);
+            *vec = normalize(normal + projected);
+            i += 1;
+        }
+
+        let mut rot_supp = vec![0.0f32; self.nodes.len()];
+
+        for edge in self.edges.iter() {
+            let index0 = edge.a as usize;
+            let index1 = edge.b as usize;
+            let old_point_0 = &self.nodes[index0].point;
+            let old_point_1 = &self.nodes[index1].point;
+            let new_point_0 = &point_shifts[index0];
+            let new_point_1 = &point_shifts[index1];
+            let ov = normalize(old_point_1 - old_point_0);
+            let nv = normalize(new_point_1 - new_point_0);
+            let suppression = (1.0 - ov.dot(nv)) * 0.5;
+            rot_supp[index0] = rot_supp[index0].max(suppression);
+            rot_supp[index1] = rot_supp[index1].max(suppression);
+        }
+
+        let mut total_shift = 0.0f32;
+
+        for i in 0..self.nodes.len() {
+            self.nodes[i].point = {
+                let point = &self.nodes[i].point;
+                let new_point = normalize(lerp(point, &point_shifts[i], 1.0 - rot_supp[i].sqrt()));
+                total_shift += (&new_point - point).length();
+                new_point
+            };
+        }
+
+        total_shift
+    }
+
+    pub fn stat(&self) {
+        let total_surface_area = 4.0 * f32::consts::PI;
+        let ideal_face_area = total_surface_area / self.faces.len() as f32;
+        let ideal_edge_length = (ideal_face_area * 4.0 / 3.0f32.sqrt()).sqrt();
+        let ideal_face_height = ideal_edge_length * 3.0f32.sqrt() / 2.0;
+
+        let edge_lengths = self.edges
+            .iter()
+            .map(|e| {
+                     let p0 = &self.nodes[e.a as usize].point;
+                     let p1 = &self.nodes[e.b as usize].point;
+                     (p1 - p0).length()
+                 });
+
+        let edge_length_diff = edge_lengths.map(|l| l - ideal_edge_length);
+
+        println!("Variance: {}", into_variance(edge_length_diff));
+
+    }
+}
+
+fn rand(max: f32) -> f32 {
+    (random::<f32>() * 2.0 * max) - max
 }
 
 #[cfg(test)]

@@ -75,8 +75,16 @@ fn main() {
                         println!("Subdividing a level {} terrain", ico.current_level());
                         let sw = Stopwatch::start_new();
                         ico.subdivide();
+                        ico.stat();
                         println!("Subdivision took {}ms", sw.elapsed_ms());
                         // (1744 ms, lvl 6), (7401 ms, lvl 7)
+                        regenerate_mesh = true;
+                        event.inhibited = true
+                    }
+                }
+                WindowEvent::Key(Key::S, _, Action::Release, _) => {
+                    if let Some(ref mut ico) = terrain {
+                        println!("Relaxing, total movement: {}", ico.relax(0.5));
                         regenerate_mesh = true;
                         event.inhibited = true
                     }
@@ -149,7 +157,7 @@ fn add_mesh(parent: &mut SceneNode,
         let mut c = grp.add_mesh(mesh, Vector3::new(scale, scale, scale));
 
         c.set_color(0.0, 0.0, 0.0);
-        c.set_lines_width(1.0);
+        c.set_lines_width(2.0);
         c.set_material(wireframe_material);
     }
 
@@ -160,7 +168,7 @@ fn add_mesh(parent: &mut SceneNode,
 
     c.set_color(1.0, 1.0, 1.0);
     c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");
-    c.enable_backface_culling(true);
+    c.enable_backface_culling(false);
 
 
     grp

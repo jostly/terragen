@@ -90,7 +90,7 @@ impl Terrain {
                          Face::new(Index3::new(6, 8, 9), Index3::new(24, 28, 25)),
                          Face::new(Index3::new(7, 11, 10), Index3::new(27, 29, 26))];
 
-        Terrain::assign_edge_to_nodes(&mut nodes, &edges);
+        Terrain::assign_links_to_nodes(&mut nodes, &edges, &faces);
 
         Terrain {
             nodes: nodes,
@@ -102,15 +102,25 @@ impl Terrain {
 
     }
 
-    fn assign_edge_to_nodes(nodes: &mut Vec<Node>, edges: &Vec<Edge>) {
+    fn assign_links_to_nodes(nodes: &mut Vec<Node>, edges: &Vec<Edge>, faces: &Vec<Face>) {
         for n in nodes.iter_mut() {
             n.edges.clear();
+            n.faces.clear();
         }
         for (idx, e) in edges.iter().enumerate() {
             let p0 = e.a as usize;
             let p1 = e.b as usize;
             nodes[p0].add_edge(idx as u32);
             nodes[p1].add_edge(idx as u32);
+        }
+        for (idx, f) in faces.iter().enumerate() {
+            let p0 = f.points.x as usize;
+            let p1 = f.points.y as usize;
+            let p2 = f.points.z as usize;
+            let fidx = idx as u32;
+            nodes[p0].add_face(fidx);
+            nodes[p1].add_face(fidx);
+            nodes[p2].add_face(fidx);
         }
     }
 
@@ -228,7 +238,7 @@ impl Terrain {
             }
         }
 
-        Terrain::assign_edge_to_nodes(&mut self.nodes, &new_edges);
+        Terrain::assign_links_to_nodes(&mut self.nodes, &new_edges, &new_faces);
 
         self.edges = new_edges;
         self.faces = new_faces;
@@ -390,6 +400,13 @@ mod tests {
     }
 
     #[test]
+    fn new_terrain_has_faces_for_all_nodes() {
+        let terr = Terrain::new();
+
+        verify_faces_for_nodes(&terr, 5, 5);
+    }
+
+    #[test]
     fn new_terrain_has_correct_face_to_edge_linkage() {
         let terr = Terrain::new();
 
@@ -403,6 +420,15 @@ mod tests {
         terr.subdivide();
 
         verify_edges_for_nodes(&terr, 5, 6);
+    }
+
+    #[test]
+    fn subdivided_terrain_has_faces_for_all_nodes() {
+        let mut terr = Terrain::new();
+        terr.subdivide();
+        terr.subdivide();
+
+        verify_faces_for_nodes(&terr, 5, 6);
     }
 
     #[test]
@@ -421,7 +447,11 @@ mod tests {
         for (idx, e) in terr.edges.iter().enumerate() {
             let p0 = e.a as usize;
             let p1 = e.b as usize;
-            assert!(p0 != p1, "Illegal edge between {} and {}", p0, p1);
+            assert!(p0 != p1,
+                    "Illegal edge between {} and {} at index {}",
+                    p0,
+                    p1,
+                    idx);
             let edges = &terr.nodes[p0].edges;
             assert!(edges.contains(&(idx as u32)),
                     "Node {} does not link back to edge {} (links: {:?})",
@@ -453,8 +483,55 @@ mod tests {
             v.sort();
             assert_eq!(actual,
                        v,
-                       "Links mismatch for node {} (left=actual, right=expected)",
+                       "Edge links mismatch for node {} (left=actual, right=expected)",
                        i);
+        }
+    }
+
+    fn verify_faces_for_nodes(terr: &Terrain, min_faces: u32, max_faces: u32) {
+        let num_nodes = terr.nodes.len();
+        let mut seen_nodes = vec![Vec::new(); num_nodes];
+
+        for (idx, f) in terr.faces.iter().enumerate() {
+            let p0 = f.points.x as usize;
+            let p1 = f.points.y as usize;
+            let p2 = f.points.z as usize;
+            assert!(p0 != p1 && p0 != p2 && p1 != p2,
+                    "Illegal face between {}, {} and {} at index {}",
+                    p0,
+                    p1,
+                    p2,
+                    idx);
+            for p in [p0, p1, p2].iter() {
+                let faces = &terr.nodes[*p].faces;
+
+                assert!(faces.contains(&(idx as u32)),
+                        "Node {} does not link back to face {} (links: {:?})",
+                        p,
+                        idx,
+                        faces);
+
+                seen_nodes[*p].push(idx as u32);
+            }
+        }
+
+        for (i, mut v) in seen_nodes.into_iter().enumerate() {
+            let n = v.len() as u32;
+            assert!(n > 0, "No face includes node {}", i);
+            assert!(n >= min_faces && n <= max_faces,
+                    "Illegal number of faces leading to node {}: {} (links: {:?}",
+                    i,
+                    n,
+                    v);
+            let mut actual = terr.nodes[i].faces.clone();
+            actual.sort();
+
+            v.sort();
+            assert_eq!(actual,
+                       v,
+                       "Face links mismatch for node {} (left=actual, right=expected)",
+                       i);
+
         }
     }
 

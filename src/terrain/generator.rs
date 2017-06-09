@@ -433,8 +433,6 @@ impl Terrain {
                                     (multiplier * (1.0 - ideal_distance_to_centroid / length2));
         }
 
-        let origin = Vec3::new(0.0f32, 0.0, 0.0);
-
         let mut i = 0;
         for mut vec in point_shifts.iter_mut() {
             let normal = &self.nodes[i].point;
@@ -472,26 +470,6 @@ impl Terrain {
         }
 
         total_shift
-    }
-
-    pub fn stat(&self) {
-        let total_surface_area = 4.0 * f32::consts::PI;
-        let ideal_face_area = total_surface_area / self.faces.len() as f32;
-        let ideal_edge_length = (ideal_face_area * 4.0 / 3.0f32.sqrt()).sqrt();
-        let ideal_face_height = ideal_edge_length * 3.0f32.sqrt() / 2.0;
-
-        let edge_lengths = self.edges
-            .iter()
-            .map(|e| {
-                     let p0 = &self.nodes[e.a as usize].point;
-                     let p1 = &self.nodes[e.b as usize].point;
-                     (p1 - p0).length()
-                 });
-
-        let edge_length_diff = edge_lengths.map(|l| l - ideal_edge_length);
-
-        println!("Variance: {}", into_variance(edge_length_diff));
-
     }
 }
 

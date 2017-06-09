@@ -1,4 +1,4 @@
-use terrain::{Index3, Edge};
+use terrain::Index3;
 
 #[derive(Clone, Debug)]
 pub struct Face {
@@ -14,6 +14,7 @@ impl Face {
         }
     }
 
+    #[allow(dead_code)]
     pub fn node(&self, i: u32) -> u32 {
         match i % 3 {
             0 => self.points.x,
@@ -22,17 +23,13 @@ impl Face {
         }
     }
 
+    #[allow(dead_code)]
     pub fn edge(&self, i: u32) -> u32 {
         match i % 3 {
             0 => self.edges.x,
             1 => self.edges.y,
             _ => self.edges.z,
         }
-    }
-
-    #[inline]
-    pub fn opposite_node_index_of_edge(&self, edge: &Edge) -> u32 {
-        self.opposite_node_index(edge.a, edge.b)
     }
 
     pub fn opposite_node_index(&self, a: u32, b: u32) -> u32 {

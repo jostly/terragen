@@ -1,5 +1,6 @@
 use std::f32;
 
+#[allow(dead_code)]
 pub fn into_variance<I>(iter: I) -> f32
     where I: Iterator<Item = f32>
 {
@@ -20,6 +21,7 @@ pub fn into_variance<I>(iter: I) -> f32
     }
 }
 
+#[allow(dead_code)]
 pub fn variance<'a, I>(iter: I) -> f32
     where I: Iterator<Item = &'a f32>
 {
@@ -39,7 +41,6 @@ pub fn variance<'a, I>(iter: I) -> f32
         (sum2 - sum * sum / n as f32) / n as f32
     }
 }
-
 
 #[cfg(test)]
 mod tests {

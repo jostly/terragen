@@ -41,13 +41,8 @@ fn main() {
     let (tx, rx) = channel();
 
     let mut terrain = Some(Terrain::new());
-    //for _ in 0..6 {
-    //if let Some(ref mut ico) = terrain {
-    //ico.subdivide();
-    //}
-    //}
 
-    let mut window = Window::new("Terragen");
+    let mut window = Window::new_with_size("Terragen", 900, 900);
 
     let eye = Point3::new(0.0, 2.0, 5.0);
     let at = Point3::origin();
@@ -76,8 +71,7 @@ fn main() {
                         println!("Subdividing a level {} terrain", ico.current_level());
                         let sw = Stopwatch::start_new();
                         ico.subdivide();
-                        ico.stat();
-                        println!("Subdivision took {}ms", sw.elapsed_ms());
+                        println!("Subdivision took {} ms", sw.elapsed_ms());
                         // (1744 ms, lvl 6), (7401 ms, lvl 7)
                         regenerate_mesh = true;
                         event.inhibited = true

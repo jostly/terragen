@@ -32,6 +32,7 @@ use std::rc::Rc;
 use std::cell::RefCell;
 use std::path::Path;
 use std::sync::mpsc::channel;
+use std::f32;
 
 fn main() {
 
@@ -82,9 +83,42 @@ fn main() {
                         event.inhibited = true
                     }
                 }
+                WindowEvent::Key(Key::A, _, Action::Release, _) => {
+                    if let Some(ref mut ico) = terrain {
+                        let topology_distortion_rate = 0.04; // 0 - 0.15
+                        let mut total_distortion =
+                            (ico.num_edges() as f32 * topology_distortion_rate).ceil() as u32;
+                        let mut iterations = 6;
+                        while iterations > 0 {
+                            let iteration_distortion = total_distortion / iterations;
+                            total_distortion -= iteration_distortion;
+                            ico.distort(iteration_distortion);
+                            ico.relax(0.);
+                            iterations -= 1;
+                        }
+                        regenerate_mesh = true;
+                        event.inhibited = true;
+                    }
+                }
                 WindowEvent::Key(Key::S, _, Action::Release, _) => {
                     if let Some(ref mut ico) = terrain {
-                        println!("Relaxing, total movement: {}", ico.relax(0.5));
+                        let max_relax = 300;
+                        let mut last_move = f32::MAX;
+                        let mut i = 1;
+                        let num_nodes = ico.num_nodes() as f32;
+                        let average_node_radius = (f32::consts::PI * 4.0 / num_nodes).sqrt();
+                        let min_shift_delta = average_node_radius * num_nodes / 500000.0;
+                        while i <= max_relax {
+                            let rel = ico.relax(0.5);
+                            println!("Relaxation iteration {}: {}", i, rel);
+                            let diff = (last_move - rel).abs();
+                            if diff < min_shift_delta {
+                                println!("Relaxation converging with diff {}", diff);
+                                break;
+                            }
+                            last_move = rel;
+                            i += 1;
+                        }
                         regenerate_mesh = true;
                         event.inhibited = true
                     }

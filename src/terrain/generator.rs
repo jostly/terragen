@@ -1,7 +1,8 @@
 use math::*;
 use terrain::{Edge, Face, Node, Index3, Vertex};
 
-use rand::random;
+use rand::{random, thread_rng};
+use rand::distributions::{IndependentSample, Range};
 use std::f32;
 use std::collections::HashMap;
 
@@ -38,36 +39,36 @@ impl Terrain {
                              Node::new(Vertex::new(-dv, du, z), random_elevation()),
                              Node::new(Vertex::new(-dv, -du, z), random_elevation())];
 
-        let edges = vec![Edge::new(0, 1),
-                         Edge::new(0, 4),
-                         Edge::new(0, 5),
-                         Edge::new(0, 8),
-                         Edge::new(0, 10),
-                         Edge::new(1, 6),
-                         Edge::new(1, 7),
-                         Edge::new(1, 8),
-                         Edge::new(1, 10),
-                         Edge::new(2, 3),
-                         Edge::new(2, 4),
-                         Edge::new(2, 5),
-                         Edge::new(2, 9),
-                         Edge::new(2, 11),
-                         Edge::new(3, 6),
-                         Edge::new(3, 7),
-                         Edge::new(3, 9),
-                         Edge::new(3, 11),
-                         Edge::new(4, 5),
-                         Edge::new(4, 8),
-                         Edge::new(4, 9),
-                         Edge::new(5, 10),
-                         Edge::new(5, 11),
-                         Edge::new(6, 7),
-                         Edge::new(6, 8),
-                         Edge::new(6, 9),
-                         Edge::new(7, 10),
-                         Edge::new(7, 11),
-                         Edge::new(8, 9),
-                         Edge::new(10, 11)];
+        let mut edges = vec![Edge::new(0, 1),
+                             Edge::new(0, 4),
+                             Edge::new(0, 5),
+                             Edge::new(0, 8),
+                             Edge::new(0, 10),
+                             Edge::new(1, 6),
+                             Edge::new(1, 7),
+                             Edge::new(1, 8),
+                             Edge::new(1, 10),
+                             Edge::new(2, 3),
+                             Edge::new(2, 4),
+                             Edge::new(2, 5),
+                             Edge::new(2, 9),
+                             Edge::new(2, 11),
+                             Edge::new(3, 6),
+                             Edge::new(3, 7),
+                             Edge::new(3, 9),
+                             Edge::new(3, 11),
+                             Edge::new(4, 5),
+                             Edge::new(4, 8),
+                             Edge::new(4, 9),
+                             Edge::new(5, 10),
+                             Edge::new(5, 11),
+                             Edge::new(6, 7),
+                             Edge::new(6, 8),
+                             Edge::new(6, 9),
+                             Edge::new(7, 10),
+                             Edge::new(7, 11),
+                             Edge::new(8, 9),
+                             Edge::new(10, 11)];
 
         let faces = vec![Face::new(Index3::new(0, 8, 1), Index3::new(3, 7, 0)),
                          Face::new(Index3::new(0, 5, 4), Index3::new(2, 18, 1)),
@@ -91,6 +92,7 @@ impl Terrain {
                          Face::new(Index3::new(7, 11, 10), Index3::new(27, 29, 26))];
 
         Terrain::assign_links_to_nodes(&mut nodes, &edges, &faces);
+        Terrain::assign_links_to_edges(&mut edges, &faces);
 
         Terrain {
             nodes: nodes,
@@ -124,8 +126,28 @@ impl Terrain {
         }
     }
 
+    fn assign_links_to_edges(edges: &mut Vec<Edge>, faces: &Vec<Face>) {
+        for (idx, f) in faces.iter().enumerate() {
+            let p0 = f.edges.x as usize;
+            let p1 = f.edges.y as usize;
+            let p2 = f.edges.z as usize;
+            let fidx = idx as u32;
+            edges[p0].add_face(fidx);
+            edges[p1].add_face(fidx);
+            edges[p2].add_face(fidx);
+        }
+    }
+
     pub fn current_level(&self) -> u8 {
         self.level
+    }
+
+    pub fn num_edges(&self) -> u32 {
+        self.edges.len() as u32
+    }
+
+    pub fn num_nodes(&self) -> u32 {
+        self.nodes.len() as u32
     }
 
     pub fn face_midpoint(&self, face: &Face) -> Vertex {
@@ -239,6 +261,7 @@ impl Terrain {
         }
 
         Terrain::assign_links_to_nodes(&mut self.nodes, &new_edges, &new_faces);
+        Terrain::assign_links_to_edges(&mut new_edges, &new_faces);
 
         self.edges = new_edges;
         self.faces = new_faces;
@@ -248,45 +271,133 @@ impl Terrain {
               self.faces.len());
     }
 
-    fn rotation_predicate(old_node_0: &Vertex,
-                          old_node_1: &Vertex,
-                          new_node_0: &Vertex,
-                          new_node_1: &Vertex)
+    fn rotation_predicate(old_node_0: &Node,
+                          old_node_1: &Node,
+                          new_node_0: &Node,
+                          new_node_1: &Node)
                           -> bool {
-        let old_edge_len = distance(old_node_0, old_node_1);
-        let new_edge_len = distance(new_node_0, new_node_1);
+
+        if new_node_0.faces.len() >= 7 || new_node_1.faces.len() >= 7 ||
+           old_node_0.faces.len() <= 5 || old_node_1.faces.len() <= 5 {
+            return false;
+        }
+        let old_edge_len = distance(&old_node_0.point, &old_node_1.point);
+        let new_edge_len = distance(&new_node_0.point, &new_node_1.point);
         let ratio = old_edge_len / new_edge_len;
         if ratio >= 2.0 || ratio <= 0.5 {
             return false;
         }
-        let v0 = (old_node_1 - old_node_0) / old_edge_len;
-        let v1 = normalize(new_node_0 - old_node_0);
-        let v2 = normalize(new_node_1 - old_node_0);
+        let v0 = (&old_node_1.point - &old_node_0.point) / old_edge_len;
+        let v1 = normalize(&new_node_0.point - &old_node_0.point);
+        let v2 = normalize(&new_node_1.point - &old_node_0.point);
         if v0.dot(v1) < 0.2 || v0.dot(v2) < 0.2 {
             return false;
         }
-        let v3 = normalize(new_node_0 - old_node_1);
-        let v4 = normalize(new_node_1 - old_node_1);
+        let v3 = normalize(&new_node_0.point - &old_node_1.point);
+        let v4 = normalize(&new_node_1.point - &old_node_1.point);
         if v0.dot(v3) > -0.2 || v0.dot(v4) > -0.2 {
             return false;
         }
         true
     }
 
-    fn conditional_rotate_edge(&mut self, edge_index: usize) -> bool {
-        let edge = &self.edges[edge_index];
-        // TODO faces for edges let face0 = &self.faces[edge.face[0]
-        false
+    fn conditional_rotate_edge(&mut self, edge_index: u32) -> bool {
+        let mut edge = self.edges[edge_index as usize].clone();
+        let ef0 = edge.faces[0] as usize;
+        let ef1 = edge.faces[1] as usize;
+        let mut face0 = self.faces[ef0].clone();
+        let mut face1 = self.faces[ef1].clone();
+        let far_node_face_index_0 = face0.opposite_node_index(edge.a, edge.b);
+        let far_node_face_index_1 = face1.opposite_node_index(edge.a, edge.b);
+        let new_node_index_0 = face0.points[far_node_face_index_0];
+        let old_node_index_0 = face0.points[far_node_face_index_0 + 1];
+        let new_node_index_1 = face1.points[far_node_face_index_1];
+        let old_node_index_1 = face1.points[far_node_face_index_1 + 1];
+        let mut old_node_0 = self.nodes[old_node_index_0 as usize].clone();
+        let mut old_node_1 = self.nodes[old_node_index_1 as usize].clone();
+        let mut new_node_0 = self.nodes[new_node_index_0 as usize].clone();
+        let mut new_node_1 = self.nodes[new_node_index_1 as usize].clone();
+        let new_edge_index_0 = face1.edges[far_node_face_index_1 + 2];
+        let new_edge_index_1 = face0.edges[far_node_face_index_0 + 2];
+        let mut new_edge_0 = self.edges[new_edge_index_0 as usize].clone();
+        let mut new_edge_1 = self.edges[new_edge_index_1 as usize].clone();
+
+        if !Terrain::rotation_predicate(&old_node_0, &old_node_1, &new_node_0, &new_node_1) {
+            return false;
+        }
+
+        old_node_0.edges.retain(|t| *t != edge_index);
+        old_node_1.edges.retain(|t| *t != edge_index);
+
+        old_node_0.faces.retain(|t| *t != edge.faces[1]);
+        old_node_1.faces.retain(|t| *t != edge.faces[0]);
+
+        self.nodes[old_node_index_0 as usize] = old_node_0;
+        self.nodes[old_node_index_1 as usize] = old_node_1;
+
+        new_node_0.edges.push(edge_index);
+        new_node_1.edges.push(edge_index);
+
+        new_node_0.faces.push(edge.faces[1]);
+        new_node_1.faces.push(edge.faces[0]);
+
+        self.nodes[new_node_index_0 as usize] = new_node_0;
+        self.nodes[new_node_index_1 as usize] = new_node_1;
+
+        new_edge_0.faces.retain(|t| *t != edge.faces[1]);
+        new_edge_1.faces.retain(|t| *t != edge.faces[0]);
+        new_edge_0.faces.push(edge.faces[0]);
+        new_edge_1.faces.push(edge.faces[1]);
+
+        self.edges[new_edge_index_0 as usize] = new_edge_0;
+        self.edges[new_edge_index_1 as usize] = new_edge_1;
+
+        face0.points[far_node_face_index_0 + 2] = new_node_index_1;
+        face1.points[far_node_face_index_1 + 2] = new_node_index_0;
+
+        face0.edges[far_node_face_index_0 + 1] = new_edge_index_0;
+        face1.edges[far_node_face_index_1 + 1] = new_edge_index_1;
+
+        face0.edges[far_node_face_index_0 + 2] = edge_index;
+        face1.edges[far_node_face_index_1 + 2] = edge_index;
+
+        self.faces[ef0] = face0;
+        self.faces[ef1] = face1;
+
+        let new_edge = Edge::new(new_node_index_0, new_node_index_1);
+        edge.a = new_edge.a;
+        edge.b = new_edge.b;
+
+        self.edges[edge_index as usize] = edge;
+
+        true
     }
 
-    pub fn distort(&mut self) {}
+    pub fn distort(&mut self, degree: u32) -> bool {
+        println!("Distorting to degree {}", degree);
+        let num_edges = self.edges.len() as u32;
+        let mut rng = thread_rng();
+        let between = Range::new(0, num_edges as u32);
+        let mut i = 0;
+        while i < degree {
+            let mut attempts = 0;
+            let mut edge_index = between.ind_sample(&mut rng);
+            while !self.conditional_rotate_edge(edge_index) {
+                attempts += 1;
+                if attempts >= num_edges {
+                    return false;
+                }
+                edge_index = (edge_index + 1) % num_edges;
+            }
+            i += 1;
+        }
+        true
+    }
 
     pub fn relax(&mut self, multiplier: f32) -> f32 {
         let total_surface_area = 4.0 * f32::consts::PI;
         let ideal_face_area = total_surface_area / self.faces.len() as f32;
         let q3 = 3.0f32.sqrt();
-        //let ideal_edge_length = (ideal_face_area * 4.0 / 3.0f32.sqrt()).sqrt();
-        //let ideal_distance_to_centroid = ideal_edge_length * 3.0f32.sqrt() / 3.0 * 0.9;
         let ideal_distance_to_centroid = 2.0 * (q3 * ideal_face_area).sqrt() / 3.0 * 0.9;
 
         let mut point_shifts = vec![Vec3::new(0.0f32, 0.0, 0.0); self.nodes.len()];
@@ -410,6 +521,7 @@ mod tests {
     fn new_terrain_has_correct_face_to_edge_linkage() {
         let terr = Terrain::new();
 
+        verify_faces_for_edges(&terr, 2, 2);
         verify_face_to_edge_link(&terr);
     }
 
@@ -437,6 +549,7 @@ mod tests {
         terr.subdivide();
         terr.subdivide();
 
+        verify_faces_for_edges(&terr, 2, 2);
         verify_face_to_edge_link(&terr);
     }
 
@@ -530,6 +643,53 @@ mod tests {
             assert_eq!(actual,
                        v,
                        "Face links mismatch for node {} (left=actual, right=expected)",
+                       i);
+
+        }
+    }
+
+    fn verify_faces_for_edges(terr: &Terrain, min_faces: u32, max_faces: u32) {
+        let mut num_edges = terr.edges.len();
+        let mut seen_edges = vec![Vec::new(); num_edges];
+
+        for (idx, f) in terr.faces.iter().enumerate() {
+            let p0 = f.edges.x as usize;
+            let p1 = f.edges.y as usize;
+            let p2 = f.edges.z as usize;
+            assert!(p0 != p1 && p0 != p2 && p1 != p2,
+                    "Illegal face between edges {}, {} and {} at index {}",
+                    p0,
+                    p1,
+                    p2,
+                    idx);
+            for p in [p0, p1, p2].iter() {
+                let faces = &terr.edges[*p].faces;
+
+                assert!(faces.contains(&(idx as u32)),
+                        "Edge {} does not link back to face {} (links: {:?})",
+                        p,
+                        idx,
+                        faces);
+
+                seen_edges[*p].push(idx as u32);
+            }
+        }
+
+        for (i, mut v) in seen_edges.into_iter().enumerate() {
+            let n = v.len() as u32;
+            assert!(n > 0, "No face includes edge {}", i);
+            assert!(n >= min_faces && n <= max_faces,
+                    "Illegal number of faces leading to edge {}: {} (links: {:?}",
+                    i,
+                    n,
+                    v);
+            let mut actual = terr.edges[i].faces.clone();
+            actual.sort();
+
+            v.sort();
+            assert_eq!(actual,
+                       v,
+                       "Face links mismatch for edge {} (left=actual, right=expected)",
                        i);
 
         }

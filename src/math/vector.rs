@@ -163,6 +163,31 @@ scalar_assignop!(MulAssign, mul_assign);
 scalar_binop!(Div, div);
 scalar_assignop!(DivAssign, div_assign);
 
+impl<T> Index<u32> for Vec3<T>
+    where T: Sized
+{
+    type Output = T;
+    fn index(&self, index: u32) -> &Self::Output {
+        match index % 3 {
+            0 => &self.x,
+            1 => &self.y,
+            _ => &self.z,
+        }
+    }
+}
+
+impl<T> IndexMut<u32> for Vec3<T>
+    where T: Sized
+{
+    fn index_mut<'a>(&'a mut self, index: u32) -> &'a mut Self::Output {
+        match index % 3 {
+            0 => &mut self.x,
+            1 => &mut self.y,
+            _ => &mut self.z,
+        }
+    }
+}
+
 pub trait DotProduct<T> {
     type Output;
 

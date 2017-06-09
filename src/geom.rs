@@ -225,6 +225,11 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
 
     println!("  Built midpoint registry @ {} ms", sw.elapsed_ms()); // (554 ms)
 
+    let mut pentagons = 0;
+    let mut hexagons = 0;
+    let mut heptagons = 0;
+    let mut othergons = 0;
+
     let mut st_a = Stopwatch::new();
     let mut st_b = Stopwatch::new();
     let mut st_b_0 = Stopwatch::new();
@@ -334,6 +339,13 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
 
         midpoint /= n as f32;
 
+        match n {
+            5 => pentagons += 1,
+            6 => hexagons += 1,
+            7 => heptagons += 1,
+            _ => othergons += 1,
+        }
+
         mesh_vertices.push(Point3::from(&midpoint));
         mesh_normals.push(Vector3::from(normal));
 
@@ -374,6 +386,15 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
     println!("    Capacity mesh_texcoords: {} / {}",
              mesh_texcoords.len(),
              mesh_texcoords.capacity());
+
+    let total_faces = pentagons + hexagons + heptagons;
+    println!("  Number of tiles: {}", total_faces);
+    println!("    Pentagons: {}", pentagons);
+    println!("    Hexagons : {}", hexagons);
+    println!("    Heptagons: {}", heptagons);
+    if othergons > 0 {
+        println!("  Also found {} tiles of other sizes", othergons);
+    }
 
     sw.restart();
     let r = Message::Complete(mesh_vertices,

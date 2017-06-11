@@ -1,6 +1,6 @@
 use terrain::Vertex;
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct Node {
     pub point: Vertex,
     pub faces: Vec<u32>,

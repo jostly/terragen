@@ -2,6 +2,7 @@ mod edge;
 mod face;
 mod node;
 mod generator;
+pub mod planet;
 
 use math::Vec3;
 

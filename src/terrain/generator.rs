@@ -1,5 +1,6 @@
 use math::*;
 use terrain::{Edge, Face, Node, Index3, Vertex};
+use terrain::planet::{Planet, Tile};
 
 use rand::{random, thread_rng};
 use rand::distributions::{IndependentSample, Range};
@@ -471,6 +472,72 @@ impl Terrain {
 
         total_shift
     }
+
+    pub fn to_planet(&self) -> Planet {
+        let num_tiles = self.nodes.len();
+        let num_vertices = self.faces.len();
+
+        let mut vertices = Vec::with_capacity(num_vertices + num_tiles);
+        let mut tiles = Vec::with_capacity(num_tiles);
+
+        for face in self.faces.iter() {
+            vertices.push(self.face_midpoint(face));
+        }
+
+        for (i, node) in self.nodes.iter().enumerate() {
+            let node_index = i as u32;
+            let mut border = Vec::with_capacity(node.faces.len());
+
+            let mut face_index = node.faces[0];
+            let mut midpoint = Vec3::new(0.0, 0.0, 0.0);
+
+            loop {
+
+                border.push(face_index);
+
+                midpoint += &vertices[face_index as usize];
+
+                let face = &self.faces[face_index as usize];
+                let edge_index = if face.points.x == node_index {
+                    face.edges[2]
+                } else if face.points.y == node_index {
+                    face.edges[0]
+                } else if face.points.z == node_index {
+                    face.edges[1]
+                } else {
+                    panic!("Face {:?} @ {} didn't contain node {:?} @ {}",
+                           face,
+                           face_index,
+                           node,
+                           node_index);
+                };
+
+                let edge = &self.edges[edge_index as usize];
+                face_index = if edge.faces[0] == face_index {
+                    edge.faces[1]
+                } else if edge.faces[1] == face_index {
+                    edge.faces[0]
+                } else {
+                    panic!("Edge {:?} @ {} didn't contain face {:?} @ {}",
+                           edge,
+                           edge_index,
+                           face,
+                           face_index)
+                };
+
+                if face_index == node.faces[0] {
+                    break;
+                }
+            }
+
+            vertices.push(midpoint / border.len() as f32);
+
+            let tile = Tile::new(border, num_vertices as u32 + node_index);
+            tiles.push(tile);
+        }
+
+        Planet::new(vertices, tiles)
+    }
 }
 
 fn rand(max: f32) -> f32 {
@@ -627,7 +694,7 @@ mod tests {
     }
 
     fn verify_faces_for_edges(terr: &Terrain, min_faces: u32, max_faces: u32) {
-        let mut num_edges = terr.edges.len();
+        let num_edges = terr.edges.len();
         let mut seen_edges = vec![Vec::new(); num_edges];
 
         for (idx, f) in terr.faces.iter().enumerate() {

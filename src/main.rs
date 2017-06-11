@@ -184,7 +184,7 @@ fn add_mesh(parent: &mut SceneNode,
         let scale = 1.001;
         let mut c = grp.add_mesh(mesh, Vector3::new(scale, scale, scale));
 
-        c.set_color(0.0, 0.0, 0.0);
+        c.set_color(0.5, 0.5, 0.5);
         c.set_lines_width(2.0);
         c.set_material(wireframe_material);
     }

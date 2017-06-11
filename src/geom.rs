@@ -241,6 +241,8 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
     if othergons > 0 {
         println!("  Also found {} tiles of other sizes", othergons);
     }
+    println!("  Earth analogy: average tile is {} km^2",
+             510100000 / total_faces);
 
     sw.restart();
     let r = Message::Complete(mesh_vertices,

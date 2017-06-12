@@ -19,6 +19,7 @@ use kiss3d::light::Light;
 use kiss3d::camera::ArcBall;
 use kiss3d::scene::SceneNode;
 use kiss3d::resource::{Mesh, Material};
+use kiss3d::text::Font;
 
 use glfw::{Action, Key, WindowEvent};
 
@@ -44,6 +45,8 @@ fn main() {
 
     let mut window = Window::new_with_size("Terragen", 900, 900);
 
+    let font = Font::new(&Path::new("media/1942_report/1942.ttf"), 50);
+
     let eye = Point3::new(0.0, 2.0, 50.0);
     let at = Point3::origin();
     let mut arc_ball = ArcBall::new(eye, at);
@@ -62,8 +65,19 @@ fn main() {
     let mut regenerate_mesh = true;
     let mut use_wireframe = true;
     let mut rotate = true;
+    let mut current_level = 0;
 
     while window.render_with_camera(&mut arc_ball) {
+        let text_point = Point2::new(50.0, 50.0);
+
+        if let Some(ref terr) = terrain {
+            current_level = terr.current_level();
+        }
+        window.draw_text(&format!("Level: {}", current_level),
+                         &text_point,
+                         &font,
+                         &Point3::new(1.0, 1.0, 1.0));
+
         for mut event in window.events().iter() {
             match event.value {
                 WindowEvent::Key(Key::Space, _, Action::Release, _) => {

@@ -143,13 +143,16 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
         num_faces += tile.border.len();
     }
 
-    let num_vertices = num_faces + planet.tiles.len();
+    let mut num_vertices = num_faces + planet.tiles.len();
+    if generate_wireframe {
+        num_vertices += num_faces;
+        num_faces += num_faces * 2;
+    }
 
     let mut mesh_faces = Vec::with_capacity(num_faces);
     let mut mesh_vertices = Vec::with_capacity(num_vertices);
     let mut mesh_normals = Vec::with_capacity(mesh_vertices.capacity());
     let mut mesh_texcoords = Vec::with_capacity(mesh_vertices.capacity());
-    let mut wireframes = Vec::new();
 
     println!("    Capacity mesh_faces:     {} / {}",
              mesh_faces.len(),
@@ -183,26 +186,52 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
 
         let normal = Vector3::from(&normalize(planet.vertices[tile.midpoint as usize].clone()));
 
+        let elevation = (tile.elevation - min_elev) / elev_scale;
+        let colour = 1.0 - elevation.powf(1.5);
+        let uv = Point2::new(colour.min(1.0).max(0.0), 0.0);
+        let uv_outer = if generate_wireframe {
+            Point2::new(colour.min(1.0).max(0.0), 0.5)
+        } else {
+            uv.clone()
+        };
+
+        // Center
+        mesh_vertices.push(Point3::from(&planet.vertices[tile.midpoint as usize]));
+        mesh_normals.push(normal);
+        mesh_texcoords.push(uv.clone());
+
         let mut n = 0;
         for vi in tile.border.iter() {
             mesh_vertices.push(Point3::from(&planet.vertices[*vi as usize]));
             mesh_normals.push(normal.clone());
-            mesh_texcoords.push(Point2::new(0.0, 0.0));
+            mesh_texcoords.push(uv_outer.clone());
             n += 1;
         }
 
-        mesh_vertices.push(Point3::from(&planet.vertices[tile.midpoint as usize]));
-        mesh_normals.push(normal);
-        mesh_texcoords.push(Point2::new(0.0, 0.0));
+        if generate_wireframe {
+            let mp = &planet.vertices[tile.midpoint as usize];
+            for vi in tile.border.iter() {
+                let delta = (&planet.vertices[*vi as usize] - mp) * 0.95 + mp;
+                mesh_vertices.push(Point3::from(&delta));
+                mesh_normals.push(normal.clone());
+                mesh_texcoords.push(uv.clone());
+            }
+        }
 
-        let center = vertex_index + n;
+
+        let center = vertex_index;
         for j in 0..n {
-            let p1 = j;
-            let p2 = (j + 1) % n;
-            mesh_faces.push(Point3::new(center, vertex_index + p1, vertex_index + p2));
+            let p1 = vertex_index + 1 + j;
+            let p2 = vertex_index + 1 + (j + 1) % n;
             if generate_wireframe {
-                wireframes.push(vertex_index + p1);
-                wireframes.push(vertex_index + p2);
+                let p1_inner = p1 + n;
+                let p2_inner = p2 + n;
+
+                mesh_faces.push(Point3::new(center, p1_inner, p2_inner));
+                mesh_faces.push(Point3::new(p1_inner, p1, p2_inner));
+                mesh_faces.push(Point3::new(p1, p2, p2_inner));
+            } else {
+                mesh_faces.push(Point3::new(center, p1, p2));
             }
         }
 
@@ -214,9 +243,12 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
         }
 
         vertex_index += n + 1;
+        if generate_wireframe {
+            vertex_index += n;
+        }
     }
 
-    let wireframes = encode_wireframes(&wireframes);
+    let wireframes = None;
 
     println!("  Generated mesh in {} ms", sw.elapsed_ms()); // (2944 ms)
 
@@ -245,6 +277,11 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
              510100000 / total_faces);
 
     sw.restart();
+
+    for v in mesh_vertices.iter_mut() {
+        *v = *v * 10.0;
+    }
+
     let r = Message::Complete(mesh_vertices,
                               mesh_faces,
                               Some(mesh_normals),

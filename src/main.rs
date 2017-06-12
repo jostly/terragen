@@ -44,7 +44,7 @@ fn main() {
 
     let mut window = Window::new_with_size("Terragen", 900, 900);
 
-    let eye = Point3::new(0.0, 2.0, 5.0);
+    let eye = Point3::new(0.0, 2.0, 50.0);
     let at = Point3::origin();
     let mut arc_ball = ArcBall::new(eye, at);
 
@@ -184,7 +184,8 @@ fn add_mesh(parent: &mut SceneNode,
         let scale = 1.001;
         let mut c = grp.add_mesh(mesh, Vector3::new(scale, scale, scale));
 
-        c.set_color(0.5, 0.5, 0.5);
+        let wfc = 0.3;
+        c.set_color(wfc, wfc, wfc);
         c.set_lines_width(2.0);
         c.set_material(wireframe_material);
     }
@@ -196,7 +197,7 @@ fn add_mesh(parent: &mut SceneNode,
 
     c.set_color(1.0, 1.0, 1.0);
     c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");
-    c.enable_backface_culling(false);
+    c.enable_backface_culling(true);
 
 
     grp

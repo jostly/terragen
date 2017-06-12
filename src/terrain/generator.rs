@@ -532,7 +532,7 @@ impl Terrain {
 
             vertices.push(midpoint / border.len() as f32);
 
-            let tile = Tile::new(border, num_vertices as u32 + node_index);
+            let tile = Tile::new(border, num_vertices as u32 + node_index, node.elevation);
             tiles.push(tile);
         }
 

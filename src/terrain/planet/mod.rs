@@ -6,13 +6,15 @@ pub type VertexIndex = u32;
 pub struct Tile {
     pub border: Vec<VertexIndex>,
     pub midpoint: VertexIndex,
+    pub elevation: f32,
 }
 
 impl Tile {
-    pub fn new(border: Vec<VertexIndex>, midpoint: VertexIndex) -> Tile {
+    pub fn new(border: Vec<VertexIndex>, midpoint: VertexIndex, elevation: f32) -> Tile {
         Tile {
             border: border,
             midpoint: midpoint,
+            elevation: elevation,
         }
     }
 }

@@ -41,30 +41,34 @@ pub fn generate(generator: Generator,
     thread::spawn(move || {
         let sw = Stopwatch::start_new();
         let mess = match generator {
-            Generator::Regular => generate_regular(terrain, generate_wireframe),
+            Generator::Regular => generate_regular(terrain),
             Generator::Dual => generate_dual(terrain, generate_wireframe),
         };
-        println!("Generating mesh took {} ms", sw.elapsed_ms());
+        info!("Generating mesh took {} ms", sw.elapsed_ms());
         // (3568 ms, lvl 6)
 
         channel.send(mess).unwrap();
     });
 }
 
-fn generate_regular(ico: Terrain, generate_wireframe: bool) -> Message {
+fn elevation_to_uv(elevation: f32, min_elev: f32, max_elev: f32) -> Point2<f32> {
+    let d = max_elev - min_elev;
+    let scaled_elev = if d.abs() > 0.01 {
+        (elevation - min_elev) / (max_elev - min_elev)
+    } else {
+        0.5
+    };
+    Point2::new(1.0 - scaled_elev.powf(1.5), 0.0)
+}
+
+fn generate_regular(ico: Terrain) -> Message {
     let num_faces = ico.faces.len();
     let num_vertices = num_faces * 3;
     let (min_elev, max_elev) = ico.calculate_elevations();
-    let elev_scale = max_elev - min_elev;
     let mut vertices = Vec::with_capacity(num_vertices);
     let mut normals = Vec::with_capacity(num_vertices);
     let mut texcoords = Vec::with_capacity(num_vertices);
     let mut faces = Vec::with_capacity(num_faces);
-    let mut wireframes = if generate_wireframe {
-        Vec::with_capacity(num_faces * 2)
-    } else {
-        Vec::new()
-    };
 
     {
         let ico_faces = &ico.faces;
@@ -72,37 +76,28 @@ fn generate_regular(ico: Terrain, generate_wireframe: bool) -> Message {
 
         let mut vert_index = 0u32;
         for f in ico_faces.iter() {
+            let mut average_elevation = 0.0;
             for idx in [f.points.x, f.points.y, f.points.z].iter() {
                 let ref vert = ico_vertices[*idx as usize];
-                let elevation = (vert.elevation - min_elev) / elev_scale;
+                average_elevation += vert.elevation;
                 //let vertex_scale = (elevation.powi(2) - 0.5) * 0.02;
                 let vertex = &vert.point; // * (1.0 + vertex_scale);
 
                 vertices.push(Point3::from(vertex));
                 let normal = normalize(ico.face_midpoint(f));
                 normals.push(Vector3::from(&normal));
-                let uv = Point2::new(1.0 - elevation.powf(1.5), 0.0);
+            }
+            let uv = elevation_to_uv(average_elevation / 3.0, min_elev, max_elev);
+            for _ in 0..3 {
                 texcoords.push(uv);
             }
+
             faces.push(Point3::new(vert_index, vert_index + 1, vert_index + 2));
-            if generate_wireframe {
-                wireframes.push(Point3::new(vert_index, vert_index + 1, vert_index + 1));
-                wireframes.push(Point3::new(vert_index + 2, vert_index + 2, vert_index));
-            }
             vert_index += 3;
         }
     }
 
-    Message::Complete(vertices,
-                      faces,
-                      Some(normals),
-                      Some(texcoords),
-                      if generate_wireframe {
-                          Some(wireframes)
-                      } else {
-                          None
-                      },
-                      ico)
+    Message::Complete(vertices, faces, Some(normals), Some(texcoords), None, ico)
 }
 /*
 
@@ -130,7 +125,7 @@ fn generate_regular(ico: Terrain, generate_wireframe: bool) -> Message {
  */
 
 fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
-    println!("  Generator started...");
+    debug!("  Generator started...");
     let mut sw = Stopwatch::start_new();
 
     let planet = terr.to_planet();
@@ -154,25 +149,25 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
     let mut mesh_normals = Vec::with_capacity(mesh_vertices.capacity());
     let mut mesh_texcoords = Vec::with_capacity(mesh_vertices.capacity());
 
-    println!("    Capacity mesh_faces:     {} / {}",
-             mesh_faces.len(),
-             mesh_faces.capacity());
-    println!("    Capacity mesh_vertices:  {} / {}",
-             mesh_vertices.len(),
-             mesh_vertices.capacity());
-    println!("    Capacity mesh_normals:   {} / {}",
-             mesh_normals.len(),
-             mesh_normals.capacity());
-    println!("    Capacity mesh_texcoords: {} / {}",
-             mesh_texcoords.len(),
-             mesh_texcoords.capacity());
+    debug!("    Capacity mesh_faces:     {} / {}",
+           mesh_faces.len(),
+           mesh_faces.capacity());
+    debug!("    Capacity mesh_vertices:  {} / {}",
+           mesh_vertices.len(),
+           mesh_vertices.capacity());
+    debug!("    Capacity mesh_normals:   {} / {}",
+           mesh_normals.len(),
+           mesh_normals.capacity());
+    debug!("    Capacity mesh_texcoords: {} / {}",
+           mesh_texcoords.len(),
+           mesh_texcoords.capacity());
 
-    println!("  Generated vectors @ {} ms", sw.elapsed_ms());
+    debug!("  Generated vectors @ {} ms", sw.elapsed_ms());
 
     let (min_elev, max_elev) = terr.calculate_elevations();
     let elev_scale = max_elev - min_elev;
 
-    println!("  Calculated min/max elev @ {} ms", sw.elapsed_ms()); // (7 ms)
+    debug!("  Calculated min/max elev @ {} ms", sw.elapsed_ms()); // (7 ms)
 
     let mut pentagons = 0;
     let mut hexagons = 0;
@@ -188,7 +183,7 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
 
         let elevation = (tile.elevation - min_elev) / elev_scale;
         let colour = 1.0 - elevation.powf(1.5);
-        let uv = Point2::new(colour.min(1.0).max(0.0), 0.0);
+        let uv = Point2::new(colour.min(1.0).max(0.0), 0.10);
         let uv_outer = if generate_wireframe {
             Point2::new(colour.min(1.0).max(0.0), 0.5)
         } else {
@@ -198,7 +193,8 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
         // Center
         mesh_vertices.push(Point3::from(&planet.vertices[tile.midpoint as usize]));
         mesh_normals.push(normal);
-        mesh_texcoords.push(uv.clone());
+        let center_uv = Point2::new(colour.min(1.0).max(0.0), 0.0);
+        mesh_texcoords.push(center_uv);
 
         let mut n = 0;
         for vi in tile.border.iter() {
@@ -211,7 +207,7 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
         if generate_wireframe {
             let mp = &planet.vertices[tile.midpoint as usize];
             for vi in tile.border.iter() {
-                let delta = (&planet.vertices[*vi as usize] - mp) * 0.95 + mp;
+                let delta = (&planet.vertices[*vi as usize] - mp) * 0.90 + mp;
                 mesh_vertices.push(Point3::from(&delta));
                 mesh_normals.push(normal.clone());
                 mesh_texcoords.push(uv.clone());
@@ -250,37 +246,33 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
 
     let wireframes = None;
 
-    println!("  Generated mesh in {} ms", sw.elapsed_ms()); // (2944 ms)
+    debug!("  Generated mesh in {} ms", sw.elapsed_ms()); // (2944 ms)
 
-    println!("    Capacity mesh_faces:     {} / {}",
-             mesh_faces.len(),
-             mesh_faces.capacity());
-    println!("    Capacity mesh_vertices:  {} / {}",
-             mesh_vertices.len(),
-             mesh_vertices.capacity());
-    println!("    Capacity mesh_normals:   {} / {}",
-             mesh_normals.len(),
-             mesh_normals.capacity());
-    println!("    Capacity mesh_texcoords: {} / {}",
-             mesh_texcoords.len(),
-             mesh_texcoords.capacity());
+    debug!("    Capacity mesh_faces:     {} / {}",
+           mesh_faces.len(),
+           mesh_faces.capacity());
+    debug!("    Capacity mesh_vertices:  {} / {}",
+           mesh_vertices.len(),
+           mesh_vertices.capacity());
+    debug!("    Capacity mesh_normals:   {} / {}",
+           mesh_normals.len(),
+           mesh_normals.capacity());
+    debug!("    Capacity mesh_texcoords: {} / {}",
+           mesh_texcoords.len(),
+           mesh_texcoords.capacity());
 
     let total_faces = pentagons + hexagons + heptagons;
-    println!("  Number of tiles: {}", total_faces);
-    println!("    Pentagons: {}", pentagons);
-    println!("    Hexagons : {}", hexagons);
-    println!("    Heptagons: {}", heptagons);
+    debug!("  Number of tiles: {}", total_faces);
+    debug!("    Pentagons: {}", pentagons);
+    debug!("    Hexagons : {}", hexagons);
+    debug!("    Heptagons: {}", heptagons);
     if othergons > 0 {
-        println!("  Also found {} tiles of other sizes", othergons);
+        debug!("  Also found {} tiles of other sizes", othergons);
     }
-    println!("  Earth analogy: average tile is {} km^2",
-             510100000 / total_faces);
+    debug!("  Earth analogy: average tile is {} km^2",
+           510100000 / total_faces);
 
     sw.restart();
-
-    for v in mesh_vertices.iter_mut() {
-        *v = *v * 10.0;
-    }
 
     let r = Message::Complete(mesh_vertices,
                               mesh_faces,
@@ -289,34 +281,7 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
                               wireframes,
                               terr);
 
-    println!("  Creating mesh object in {} ms", sw.elapsed_ms());
+    debug!("  Creating mesh object in {} ms", sw.elapsed_ms());
 
     r
-}
-
-fn encode_wireframes(wireframes: &Vec<u32>) -> Option<Vec<Point3<u32>>> {
-    let num_points = wireframes.len();
-    if num_points == 0 {
-        None
-    } else {
-        let mut encoded = Vec::with_capacity(num_points / 3 + 1);
-        let mut i = 0;
-        while i < num_points - 3 {
-            let tri = Point3::new(wireframes[i], wireframes[i + 1], wireframes[i + 2]);
-            encoded.push(tri);
-            i += 3;
-        }
-        match num_points - i {
-            2 => {
-                let tri = Point3::new(wireframes[i], wireframes[i + 1], 0);
-                encoded.push(tri);
-            }
-            1 => {
-                let tri = Point3::new(wireframes[i], 0, 0);
-                encoded.push(tri);
-            }
-            _ => {}
-        }
-        Some(encoded)
-    }
 }

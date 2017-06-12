@@ -68,10 +68,10 @@ fn main() {
             match event.value {
                 WindowEvent::Key(Key::Space, _, Action::Release, _) => {
                     if let Some(ref mut ico) = terrain {
-                        println!("Subdividing a level {} terrain", ico.current_level());
+                        info!("Subdividing a level {} terrain", ico.current_level());
                         let sw = Stopwatch::start_new();
                         ico.subdivide();
-                        println!("Subdivision took {} ms", sw.elapsed_ms());
+                        info!("Subdivision took {} ms", sw.elapsed_ms());
                         // (1744 ms, lvl 6), (7401 ms, lvl 7)
                         regenerate_mesh = true;
                         event.inhibited = true
@@ -104,10 +104,10 @@ fn main() {
                         let min_shift_delta = average_node_radius * num_nodes / 500000.0;
                         while i <= max_relax {
                             let rel = ico.relax(0.5);
-                            println!("Relaxation iteration {}: {}", i, rel);
+                            debug!("Relaxation iteration {}: {}", i, rel);
                             let diff = (last_move - rel).abs();
                             if diff < min_shift_delta {
-                                println!("Relaxation converging with diff {}", diff);
+                                debug!("Relaxation converging with diff {}", diff);
                                 break;
                             }
                             last_move = rel;
@@ -146,9 +146,12 @@ fn main() {
             regenerate_mesh = false;
         }
         match rx.try_recv() {
-            Ok(Message::Complete(vertices, faces, normals, texcoords, wireframe, terr)) => {
+            Ok(Message::Complete(mut vertices, faces, normals, texcoords, wireframe, terr)) => {
                 if let Some(mut c) = terrain_node {
                     window.remove(&mut c);
+                }
+                for v in vertices.iter_mut() {
+                    *v = *v * 10.0;
                 }
                 terrain_node = Some(add_mesh(&mut grp,
                                              vertices,

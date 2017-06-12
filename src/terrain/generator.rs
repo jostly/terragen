@@ -375,7 +375,7 @@ impl Terrain {
     }
 
     pub fn distort(&mut self, degree: u32) -> bool {
-        println!("Distorting to degree {}", degree);
+        debug!("Distorting to degree {}", degree);
         let num_edges = self.edges.len() as u32;
         let mut rng = thread_rng();
         let between = Range::new(0, num_edges as u32);

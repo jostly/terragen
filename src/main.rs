@@ -18,7 +18,7 @@ use kiss3d::window::Window;
 use kiss3d::light::Light;
 use kiss3d::camera::ArcBall;
 use kiss3d::scene::SceneNode;
-use kiss3d::resource::{Mesh, Material};
+use kiss3d::resource::Mesh;
 use kiss3d::text::Font;
 
 use glfw::{Action, Key, WindowEvent};
@@ -26,8 +26,8 @@ use glfw::{Action, Key, WindowEvent};
 use stopwatch::Stopwatch;
 
 use terrain::Terrain;
+use terrain::planet::Planet;
 use geom::*;
-use render::WireframeMaterial;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -41,7 +41,9 @@ fn main() {
 
     let (tx, rx) = channel();
 
-    let mut terrain = Some(Terrain::new());
+    let terr = Terrain::new();
+    let mut terrain: Option<Terrain> = Some(terr);
+    let mut planet: Option<Planet> = None;
 
     let mut window = Window::new_with_size("Terragen", 900, 900);
 
@@ -53,9 +55,6 @@ fn main() {
 
     window.set_light(Light::StickToCamera);
 
-    let wireframe_material = Rc::new(RefCell::new(Box::new(WireframeMaterial::new()) as
-                                                  Box<Material + 'static>));
-
     let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.001);
 
     let mut grp = window.add_group();
@@ -66,6 +65,7 @@ fn main() {
     let mut use_wireframe = true;
     let mut rotate = true;
     let mut current_level = 0;
+    let mut num_tiles = 0;
 
     while window.render_with_camera(&mut arc_ball) {
         let text_point = Point2::new(50.0, 50.0);
@@ -73,7 +73,10 @@ fn main() {
         if let Some(ref terr) = terrain {
             current_level = terr.current_level();
         }
-        window.draw_text(&format!("Level: {}", current_level),
+        if let Some(ref pla) = planet {
+            num_tiles = pla.num_tiles;
+        }
+        window.draw_text(&format!("Level: {}\nTiles: {}", current_level, num_tiles),
                          &text_point,
                          &font,
                          &Point3::new(1.0, 1.0, 1.0));
@@ -85,6 +88,7 @@ fn main() {
                         info!("Subdividing a level {} terrain", ico.current_level());
                         let sw = Stopwatch::start_new();
                         ico.subdivide();
+                        planet = None;
                         info!("Subdivision took {} ms", sw.elapsed_ms());
                         // (1744 ms, lvl 6), (7401 ms, lvl 7)
                         regenerate_mesh = true;
@@ -104,6 +108,7 @@ fn main() {
                             ico.relax(0.);
                             iterations -= 1;
                         }
+                        planet = None;
                         regenerate_mesh = true;
                         event.inhibited = true;
                     }
@@ -127,6 +132,7 @@ fn main() {
                             last_move = rel;
                             i += 1;
                         }
+                        planet = None;
                         regenerate_mesh = true;
                         event.inhibited = true
                     }
@@ -149,32 +155,44 @@ fn main() {
                     regenerate_mesh = true;
                     event.inhibited = true;
                 }
+                WindowEvent::Key(Key::G, _, Action::Release, _) => {
+                    if let Some(ref mut pla) = planet {
+                        pla.grow_groups();
+                        regenerate_mesh = true;
+                        event.inhibited = true;
+                    }
+                }
+                WindowEvent::Key(Key::M, _, Action::Release, _) => {
+                    if let Some(ref mut pla) = planet {
+                        pla.merge_plates();
+                        regenerate_mesh = true;
+                        event.inhibited = true;
+                    }
+                }
                 _ => {}
             }
         }
         if regenerate_mesh {
             if let Some(ico) = terrain {
-                generate(generator, ico, use_wireframe, &tx);
+                let mut p = planet.unwrap_or_else(|| ico.to_planet());
+                p.assign_groups();
+                generate(generator, ico, p, use_wireframe, &tx);
                 terrain = None;
+                planet = None;
             }
             regenerate_mesh = false;
         }
         match rx.try_recv() {
-            Ok(Message::Complete(mut vertices, faces, normals, texcoords, wireframe, terr)) => {
+            Ok(Message::Complete(mut vertices, faces, normals, texcoords, terr, pla)) => {
                 if let Some(mut c) = terrain_node {
                     window.remove(&mut c);
                 }
                 for v in vertices.iter_mut() {
                     *v = *v * 10.0;
                 }
-                terrain_node = Some(add_mesh(&mut grp,
-                                             vertices,
-                                             faces,
-                                             normals,
-                                             texcoords,
-                                             wireframe,
-                                             wireframe_material.clone()));
+                terrain_node = Some(add_mesh(&mut grp, vertices, faces, normals, texcoords));
                 terrain = Some(terr);
+                planet = Some(pla);
             }
             _ => {}
         }
@@ -189,23 +207,9 @@ fn add_mesh(parent: &mut SceneNode,
             vertices: Vec<Point3<f32>>,
             faces: Vec<Point3<u32>>,
             normals: Option<Vec<Vector3<f32>>>,
-            texcoords: Option<Vec<Point2<f32>>>,
-            wireframe: Option<Vec<Point3<u32>>>,
-            wireframe_material: Rc<RefCell<Box<Material + 'static>>>)
+            texcoords: Option<Vec<Point2<f32>>>)
             -> SceneNode {
     let mut grp = parent.add_group();
-
-    if let Some(line_faces) = wireframe {
-        let mesh = Mesh::new(vertices.clone(), line_faces, None, None, false);
-        let mesh = Rc::new(RefCell::new(mesh));
-        let scale = 1.001;
-        let mut c = grp.add_mesh(mesh, Vector3::new(scale, scale, scale));
-
-        let wfc = 0.3;
-        c.set_color(wfc, wfc, wfc);
-        c.set_lines_width(2.0);
-        c.set_material(wireframe_material);
-    }
 
     let mesh = Mesh::new(vertices, faces, normals, texcoords, false);
     let mesh = Rc::new(RefCell::new(mesh));
@@ -215,7 +219,6 @@ fn add_mesh(parent: &mut SceneNode,
     c.set_color(1.0, 1.0, 1.0);
     c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");
     c.enable_backface_culling(true);
-
 
     grp
 }

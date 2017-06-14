@@ -1,6 +1,6 @@
 use math::*;
 use terrain::{Edge, Face, Node, Index3, Vertex};
-use terrain::planet::{Planet, Tile};
+use terrain::planet::Planet;
 
 use rand::{random, thread_rng};
 use rand::distributions::{IndependentSample, Range};
@@ -478,7 +478,7 @@ impl Terrain {
         let num_vertices = self.faces.len();
 
         let mut vertices = Vec::with_capacity(num_vertices + num_tiles);
-        let mut tiles = Vec::with_capacity(num_tiles);
+        let mut borders = Vec::with_capacity(num_tiles);
 
         for face in self.faces.iter() {
             vertices.push(self.face_midpoint(face));
@@ -532,11 +532,10 @@ impl Terrain {
 
             vertices.push(midpoint / border.len() as f32);
 
-            let tile = Tile::new(border, num_vertices as u32 + node_index, node.elevation);
-            tiles.push(tile);
+            borders.push(border);
         }
 
-        Planet::new(vertices, tiles)
+        Planet::new(vertices, borders)
     }
 }
 

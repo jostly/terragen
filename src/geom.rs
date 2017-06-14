@@ -1,5 +1,6 @@
 use math::{Vec3, normalize};
 use terrain::Terrain;
+use terrain::planet::Planet;
 use na::{Vector3, Point3, Point2};
 use stopwatch::Stopwatch;
 
@@ -23,8 +24,8 @@ pub enum Message {
              Vec<Point3<u32>>,
              Option<Vec<Vector3<f32>>>,
              Option<Vec<Point2<f32>>>,
-             Option<Vec<Point3<u32>>>,
-             Terrain),
+             Terrain,
+             Planet),
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
@@ -35,14 +36,15 @@ pub enum Generator {
 
 pub fn generate(generator: Generator,
                 terrain: Terrain,
+                planet: Planet,
                 generate_wireframe: bool,
                 tx: &Sender<Message>) {
     let channel = tx.clone();
     thread::spawn(move || {
         let sw = Stopwatch::start_new();
         let mess = match generator {
-            Generator::Regular => generate_regular(terrain),
-            Generator::Dual => generate_dual(terrain, generate_wireframe),
+            Generator::Regular => generate_regular(terrain, planet),
+            Generator::Dual => generate_dual(terrain, planet, generate_wireframe),
         };
         info!("Generating mesh took {} ms", sw.elapsed_ms());
         // (3568 ms, lvl 6)
@@ -61,7 +63,7 @@ fn elevation_to_uv(elevation: f32, min_elev: f32, max_elev: f32) -> Point2<f32> 
     Point2::new(1.0 - scaled_elev.powf(1.5), 0.0)
 }
 
-fn generate_regular(ico: Terrain) -> Message {
+fn generate_regular(ico: Terrain, planet: Planet) -> Message {
     let num_faces = ico.faces.len();
     let num_vertices = num_faces * 3;
     let (min_elev, max_elev) = ico.calculate_elevations();
@@ -97,7 +99,7 @@ fn generate_regular(ico: Terrain) -> Message {
         }
     }
 
-    Message::Complete(vertices, faces, Some(normals), Some(texcoords), None, ico)
+    Message::Complete(vertices, faces, Some(normals), Some(texcoords), ico, planet)
 }
 /*
 
@@ -124,11 +126,9 @@ fn generate_regular(ico: Terrain) -> Message {
 
  */
 
-fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
+fn generate_dual(terrain: Terrain, planet: Planet, generate_wireframe: bool) -> Message {
     debug!("  Generator started...");
     let mut sw = Stopwatch::start_new();
-
-    let planet = terr.to_planet();
 
     // Count how many triangles we will need
 
@@ -164,11 +164,6 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
 
     debug!("  Generated vectors @ {} ms", sw.elapsed_ms());
 
-    let (min_elev, max_elev) = terr.calculate_elevations();
-    let elev_scale = max_elev - min_elev;
-
-    debug!("  Calculated min/max elev @ {} ms", sw.elapsed_ms()); // (7 ms)
-
     let mut pentagons = 0;
     let mut hexagons = 0;
     let mut heptagons = 0;
@@ -181,11 +176,13 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
 
         let normal = Vector3::from(&normalize(planet.vertices[tile.midpoint as usize].clone()));
 
-        let elevation = (tile.elevation - min_elev) / elev_scale;
-        let colour = 1.0 - elevation.powf(1.5);
+        //let colour = 1.0 - tile.elevation.powf(1.5);
+
+        let colour = tile.group_id as f32 / (planet.num_groups + 1) as f32 + 1.0 / 16.0;
+
         let uv = Point2::new(colour.min(1.0).max(0.0), 0.10);
         let uv_outer = if generate_wireframe {
-            Point2::new(colour.min(1.0).max(0.0), 0.5)
+            Point2::new(colour.min(1.0).max(0.0), 0.4)
         } else {
             uv.clone()
         };
@@ -244,8 +241,6 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
         }
     }
 
-    let wireframes = None;
-
     debug!("  Generated mesh in {} ms", sw.elapsed_ms()); // (2944 ms)
 
     debug!("    Capacity mesh_faces:     {} / {}",
@@ -278,8 +273,8 @@ fn generate_dual(terr: Terrain, generate_wireframe: bool) -> Message {
                               mesh_faces,
                               Some(mesh_normals),
                               Some(mesh_texcoords),
-                              wireframes,
-                              terr);
+                              terrain,
+                              planet);
 
     debug!("  Creating mesh object in {} ms", sw.elapsed_ms());
 

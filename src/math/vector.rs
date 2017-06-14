@@ -1,6 +1,6 @@
 use std::ops::*;
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 pub struct Vec3<T> {
     pub x: T,
     pub y: T,
@@ -12,6 +12,15 @@ impl<T> Vec3<T> {
         Vec3 { x: x, y: y, z: z }
     }
 }
+
+impl<T> Vec3<T>
+    where T: Default
+{
+    pub fn origo() -> Self {
+        Vec3 { ..Default::default() }
+    }
+}
+
 
 macro_rules! componentwise_binop {
     ($Trait: ident, $method: ident) => {

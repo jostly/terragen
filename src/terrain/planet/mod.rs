@@ -1,10 +1,10 @@
 use math::Vec3;
-use math::DotProduct;
 use math::normalize;
 
 use std::f32;
 
 use rand::thread_rng;
+use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 
 pub type Vertex = Vec3<f32>;
@@ -52,25 +52,26 @@ struct Plate {
 }
 
 impl Plate {
-    pub fn new(id: u32, root: TileIndex) -> Plate {
+    pub fn new(id: u32) -> Plate {
         Plate {
             id: id,
-            tiles: vec![root],
+            tiles: Vec::new(),
         }
     }
 
+    #[allow(dead_code)]
     pub fn center(&self, planet: &Planet) -> Vertex {
         let mut midpoint = Vec3::origo();
-        for tile_idx in self.tiles.iter() {
-            let tile = &planet.tiles[*tile_idx as usize];
-            let point = &planet.vertices[tile.midpoint as usize];
-            midpoint += point;
+        if !self.tiles.is_empty() {
+            for tile_idx in self.tiles.iter() {
+                let tile = &planet.tiles[*tile_idx as usize];
+                let point = &planet.vertices[tile.midpoint as usize];
+                midpoint += point;
+            }
+            normalize(midpoint)
+        } else {
+            midpoint
         }
-        normalize(midpoint)
-    }
-
-    pub fn root(&self) -> TileIndex {
-        self.tiles[0]
     }
 
     pub fn add_tile(&mut self, tile_idx: TileIndex) {
@@ -83,6 +84,7 @@ pub struct Planet {
     pub tiles: Vec<Tile>,
     pub vertex_to_tiles: Vec<Vec<TileIndex>>,
     pub tile_neighbours: Vec<Vec<TileIndex>>,
+    pub num_corners: usize,
     pub num_tiles: usize,
     pub num_plates: usize,
     plates: Vec<Plate>,
@@ -143,15 +145,15 @@ impl Planet {
 
         }
 */
-        let plates = Self::initialize_plates(num_tiles);
         Planet {
             vertices: vertices,
             tiles: tiles,
             vertex_to_tiles: vertex_tiles,
             tile_neighbours: tile_neighbours,
+            num_corners: num_corners,
             num_tiles: num_tiles,
-            num_plates: plates.len(),
-            plates: plates,
+            num_plates: 0,
+            plates: Vec::new(),
         }
     }
 
@@ -181,96 +183,92 @@ impl Planet {
         self
     }
 
-    fn initialize_plates(num_tiles: usize) -> Vec<Plate> {
-        let mut plates: Vec<Plate> = Vec::new();
-
-        let mut rng = thread_rng();
-
-        let max_range = num_tiles as u32;
-        let between = Range::new(max_range / 32 + 1, max_range / 24 + 2);
-
-        let num_plates = between.ind_sample(&mut rng);
-
-        let between = Range::new(0, num_tiles);
-
-        for plate_id in 0..num_plates {
-            // assign to random tiles
-            loop {
-                let tile_idx = between.ind_sample(&mut rng) as TileIndex;
-                if !plates.iter().any(|p| p.root() == tile_idx) {
-                    plates.push(Plate::new(plate_id, tile_idx));
-                    break;
-                }
-            }
-        }
-
-        println!("Generated {} plates", plates.len());
-
-        plates
-    }
-
-    pub fn assign_plates(&mut self) -> &Self {
+    fn initialize_plates(&mut self, num_plates: usize) -> Vec<(TileIndex, u32)> {
         // Clear previous plate assignments
         for tile in self.tiles.iter_mut() {
             tile.plate_id = 0;
         }
 
-        for plate in self.plates.iter() {
-            for tile_idx in plate.tiles.iter() {
-                self.tiles[*tile_idx as usize].plate_id = (plate.id + 1) as u32;
+        let mut plates: Vec<Plate> = Vec::new();
+        let mut rng = thread_rng();
+        let between = Range::new(0, self.num_corners);
+
+        let mut failed_count = 0;
+
+        let mut assign_queue = Vec::new();
+
+        while plates.len() < num_plates && failed_count < 10000 {
+            let corner = &self.vertex_to_tiles[between.ind_sample(&mut rng)];
+            let mut adjacent_to_existing_plate = false;
+            for tile_idx in corner.iter() {
+                if self.tiles[*tile_idx as usize].plate_id > 0 {
+                    adjacent_to_existing_plate = true;
+                    failed_count += 1;
+                    break;
+                }
             }
-        }
-
-        self
-    }
-
-    pub fn grow_plates(&mut self) {
-        let mut unassigned_indexes = Vec::new();
-        for (idx, tile) in self.tiles.iter().enumerate() {
-            if tile.plate_id == 0 {
-                unassigned_indexes.push(idx);
+            if adjacent_to_existing_plate {
+                continue;
             }
-        }
 
-        while unassigned_indexes.len() > 0 {
-            debug!("Assigning, {} to go...", unassigned_indexes.len());
-            let mut nearest_index = 0;
-            let mut nearest_plate = 0;
-            let mut nearest_distance = f32::MAX;
-            for (idx, tile_idx) in unassigned_indexes.iter().enumerate() {
-                let tile = &self.tiles[*tile_idx];
-                let neighbours = &self.tile_neighbours[*tile_idx];
-                for ne in neighbours.iter() {
-                    let other_tile = &self.tiles[*ne as usize];
-                    if other_tile.plate_id != 0 {
-                        let midpoint = &self.vertices[tile.midpoint as usize];
-                        let plate = &self.plates[(other_tile.plate_id - 1) as usize];
-                        let other_midpoint = plate.center(self);
+            failed_count = 0;
 
-                        let distance = (other_midpoint.dot(midpoint) /
-                                        (other_midpoint.length() * midpoint.length()))
-                                .acos();
+            let mut plate = Plate::new(1 + plates.len() as u32);
 
-                        //                        let distance = (other_midpoint - midpoint).length_squared();
-                        if distance < nearest_distance {
-                            nearest_plate = other_tile.plate_id;
-                            nearest_index = idx;
-                            nearest_distance = distance;
-                            debug!("Distance from {:?} to {:?} is {}",
-                                   tile,
-                                   other_tile,
-                                   distance);
-                        }
+            for tile_idx in corner.iter() {
+                plate.add_tile(*tile_idx);
+                self.tiles[*tile_idx as usize].plate_id = plate.id;
+            }
+
+            for tile_idx in corner.iter() {
+                for other_tile_idx in self.tile_neighbours[*tile_idx as usize].iter() {
+                    let other_tile = &self.tiles[*other_tile_idx as usize];
+                    if other_tile.plate_id == 0 {
+                        assign_queue.push((*other_tile_idx, plate.id));
                     }
                 }
             }
 
-            let tile_idx = unassigned_indexes.swap_remove(nearest_index);
-            self.tiles[tile_idx].plate_id = nearest_plate;
-            self.plates[(nearest_plate - 1) as usize].add_tile(tile_idx as u32);
-            debug!("Assigned {:?}", self.tiles[tile_idx]);
-            //break;
+            plates.push(plate);
         }
+
+        self.num_plates = plates.len();
+        self.plates = plates;
+
+        assign_queue
+    }
+
+    pub fn assign_plates(&mut self) -> &Self {
+
+        for plate in self.plates.iter() {
+            for tile_idx in plate.tiles.iter() {
+                self.tiles[*tile_idx as usize].plate_id = plate.id;
+            }
+        }
+        self
+    }
+
+    pub fn grow_plates(&mut self) {
+        let mut assign_queue = self.initialize_plates(15);
+
+        while !assign_queue.is_empty() {
+            let mut rng = thread_rng();
+            let idx = (rng.next_f32().powf(2.0) * assign_queue.len() as f32).floor() as usize;
+            let (tile_idx, plate_id) = assign_queue.remove(idx);
+
+            if self.tiles[tile_idx as usize].plate_id == 0 {
+                self.tiles[tile_idx as usize].plate_id = plate_id;
+                self.plates[plate_id as usize - 1].add_tile(tile_idx);
+                for other_idx in self.tile_neighbours[tile_idx as usize].iter() {
+                    let other_tile = &self.tiles[*other_idx as usize];
+                    if other_tile.plate_id == 0 {
+                        assign_queue.push((*other_idx, plate_id));
+                    }
+                }
+            }
+
+        }
+
     }
 
     pub fn merge_plates(&mut self) {
@@ -322,6 +320,5 @@ impl Planet {
         self.plates = plates;
 
         self.assign_plates();
-
     }
 }

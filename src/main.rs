@@ -217,7 +217,7 @@ fn add_mesh(parent: &mut SceneNode,
     let mut c = grp.add_mesh(mesh.clone(), Vector3::new(1.0, 1.0, 1.0));
 
     c.set_color(1.0, 1.0, 1.0);
-    c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");
+    c.set_texture_from_file(&Path::new("media/groups.png"), "colour_ramp");
     c.enable_backface_culling(true);
 
     grp

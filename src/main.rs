@@ -157,7 +157,7 @@ fn main() {
                 }
                 WindowEvent::Key(Key::G, _, Action::Release, _) => {
                     if let Some(ref mut pla) = planet {
-                        pla.grow_groups();
+                        pla.grow_plates();
                         regenerate_mesh = true;
                         event.inhibited = true;
                     }
@@ -175,7 +175,7 @@ fn main() {
         if regenerate_mesh {
             if let Some(ico) = terrain {
                 let mut p = planet.unwrap_or_else(|| ico.to_planet());
-                p.assign_groups();
+                p.assign_plates();
                 generate(generator, ico, p, use_wireframe, &tx);
                 terrain = None;
                 planet = None;

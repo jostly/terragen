@@ -16,7 +16,7 @@ pub struct Tile {
     pub border: Vec<VertexIndex>,
     pub midpoint: VertexIndex,
     pub elevation: f32,
-    pub group_id: u32,
+    pub plate_id: u32,
 }
 
 impl Tile {
@@ -25,7 +25,7 @@ impl Tile {
             border: border,
             midpoint: midpoint,
             elevation: elevation,
-            group_id: 0,
+            plate_id: 0,
         }
     }
 
@@ -78,18 +78,13 @@ impl Plate {
     }
 }
 
-struct Groups {
-    group_centers: Vec<usize>,
-    unassigned_indexes: Vec<usize>,
-}
-
 pub struct Planet {
     pub vertices: Vec<Vertex>,
     pub tiles: Vec<Tile>,
     pub vertex_to_tiles: Vec<Vec<TileIndex>>,
     pub tile_neighbours: Vec<Vec<TileIndex>>,
     pub num_tiles: usize,
-    pub num_groups: usize,
+    pub num_plates: usize,
     plates: Vec<Plate>,
 }
 
@@ -155,11 +150,12 @@ impl Planet {
             vertex_to_tiles: vertex_tiles,
             tile_neighbours: tile_neighbours,
             num_tiles: num_tiles,
-            num_groups: plates.len(),
+            num_plates: plates.len(),
             plates: plates,
         }
     }
 
+    #[allow(dead_code)]
     pub fn normalize_elevations(mut self) -> Self {
         let mut min_elevation = f32::MAX;
         let mut max_elevation = f32::MIN;
@@ -213,25 +209,25 @@ impl Planet {
         plates
     }
 
-    pub fn assign_groups(&mut self) -> &Self {
-        // Clear previous group assignments
+    pub fn assign_plates(&mut self) -> &Self {
+        // Clear previous plate assignments
         for tile in self.tiles.iter_mut() {
-            tile.group_id = 0;
+            tile.plate_id = 0;
         }
 
-        for (idx, plate) in self.plates.iter().enumerate() {
+        for plate in self.plates.iter() {
             for tile_idx in plate.tiles.iter() {
-                self.tiles[*tile_idx as usize].group_id = (plate.id + 1) as u32;
+                self.tiles[*tile_idx as usize].plate_id = (plate.id + 1) as u32;
             }
         }
 
         self
     }
 
-    pub fn grow_groups(&mut self) {
+    pub fn grow_plates(&mut self) {
         let mut unassigned_indexes = Vec::new();
         for (idx, tile) in self.tiles.iter().enumerate() {
-            if tile.group_id == 0 {
+            if tile.plate_id == 0 {
                 unassigned_indexes.push(idx);
             }
         }
@@ -239,16 +235,16 @@ impl Planet {
         while unassigned_indexes.len() > 0 {
             debug!("Assigning, {} to go...", unassigned_indexes.len());
             let mut nearest_index = 0;
-            let mut nearest_group = 0;
+            let mut nearest_plate = 0;
             let mut nearest_distance = f32::MAX;
             for (idx, tile_idx) in unassigned_indexes.iter().enumerate() {
                 let tile = &self.tiles[*tile_idx];
                 let neighbours = &self.tile_neighbours[*tile_idx];
                 for ne in neighbours.iter() {
                     let other_tile = &self.tiles[*ne as usize];
-                    if other_tile.group_id != 0 {
+                    if other_tile.plate_id != 0 {
                         let midpoint = &self.vertices[tile.midpoint as usize];
-                        let plate = &self.plates[(other_tile.group_id - 1) as usize];
+                        let plate = &self.plates[(other_tile.plate_id - 1) as usize];
                         let other_midpoint = plate.center(self);
 
                         let distance = (other_midpoint.dot(midpoint) /
@@ -257,7 +253,7 @@ impl Planet {
 
                         //                        let distance = (other_midpoint - midpoint).length_squared();
                         if distance < nearest_distance {
-                            nearest_group = other_tile.group_id;
+                            nearest_plate = other_tile.plate_id;
                             nearest_index = idx;
                             nearest_distance = distance;
                             debug!("Distance from {:?} to {:?} is {}",
@@ -270,8 +266,8 @@ impl Planet {
             }
 
             let tile_idx = unassigned_indexes.swap_remove(nearest_index);
-            self.tiles[tile_idx].group_id = nearest_group;
-            self.plates[(nearest_group - 1) as usize].add_tile(tile_idx as u32);
+            self.tiles[tile_idx].plate_id = nearest_plate;
+            self.plates[(nearest_plate - 1) as usize].add_tile(tile_idx as u32);
             debug!("Assigned {:?}", self.tiles[tile_idx]);
             //break;
         }
@@ -325,7 +321,7 @@ impl Planet {
 
         self.plates = plates;
 
-        self.assign_groups();
+        self.assign_plates();
 
     }
 }

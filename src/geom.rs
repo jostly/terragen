@@ -178,7 +178,7 @@ fn generate_dual(terrain: Terrain, planet: Planet, generate_wireframe: bool) -> 
 
         //let colour = 1.0 - tile.elevation.powf(1.5);
 
-        let colour = tile.group_id as f32 / (planet.num_groups + 1) as f32 + 1.0 / 16.0;
+        let colour = tile.plate_id as f32 / (planet.num_plates + 1) as f32 + 1.0 / 16.0;
 
         let uv = Point2::new(colour.min(1.0).max(0.0), 0.10);
         let uv_outer = if generate_wireframe {

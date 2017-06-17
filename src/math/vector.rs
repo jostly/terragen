@@ -201,25 +201,38 @@ pub trait DotProduct<T> {
     type Output;
 
     fn dot(&self, other: T) -> Self::Output;
+    fn cross(&self, other: T) -> Self;
 }
 
 impl<'a, T> DotProduct<&'a Vec3<T>> for Vec3<T>
-    where T: Mul<T, Output = T> + Add<T, Output = T> + Copy
+    where T: Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T> + Copy
 {
     type Output = T;
 
     fn dot(&self, other: &'a Vec3<T>) -> Self::Output {
         (self.x * other.x) + (self.y * other.y) + (self.z * other.z)
     }
+
+    fn cross(&self, other: &'a Vec3<T>) -> Self {
+        Vec3::new(self.y * other.z - self.z * other.y,
+                  self.z * other.x - self.x * other.z,
+                  self.x * other.y - self.y * other.x)
+    }
 }
 
 impl<T> DotProduct<Vec3<T>> for Vec3<T>
-    where T: Mul<T, Output = T> + Add<T, Output = T> + Copy
+    where T: Mul<T, Output = T> + Add<T, Output = T> + Sub<T, Output = T> + Copy
 {
     type Output = T;
 
     fn dot(&self, other: Vec3<T>) -> Self::Output {
         (self.x * other.x) + (self.y * other.y) + (self.z * other.z)
+    }
+
+    fn cross(&self, other: Vec3<T>) -> Self {
+        Vec3::new(self.y * other.z - self.z * other.y,
+                  self.z * other.x - self.x * other.z,
+                  self.x * other.y - self.y * other.x)
     }
 }
 

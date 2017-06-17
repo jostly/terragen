@@ -32,6 +32,7 @@ pub enum Message {
 pub enum Generator {
     Regular,
     Dual,
+    Plates,
 }
 
 pub fn generate(generator: Generator,
@@ -44,7 +45,8 @@ pub fn generate(generator: Generator,
         let sw = Stopwatch::start_new();
         let mess = match generator {
             Generator::Regular => generate_regular(terrain, planet),
-            Generator::Dual => generate_dual(terrain, planet, generate_wireframe),
+            Generator::Dual => generate_dual(terrain, planet, generate_wireframe, false),
+            Generator::Plates => generate_dual(terrain, planet, generate_wireframe, true),
         };
         info!("Generating mesh took {} ms", sw.elapsed_ms());
         // (3568 ms, lvl 6)
@@ -126,7 +128,11 @@ fn generate_regular(ico: Terrain, planet: Planet) -> Message {
 
  */
 
-fn generate_dual(terrain: Terrain, planet: Planet, generate_wireframe: bool) -> Message {
+fn generate_dual(terrain: Terrain,
+                 planet: Planet,
+                 generate_wireframe: bool,
+                 show_plates: bool)
+                 -> Message {
     debug!("  Generator started...");
     let mut sw = Stopwatch::start_new();
 
@@ -135,7 +141,7 @@ fn generate_dual(terrain: Terrain, planet: Planet, generate_wireframe: bool) -> 
     let mut num_faces = 0;
 
     for tile in planet.tiles.iter() {
-        num_faces += tile.border.len();
+        num_faces += tile.vertices.len();
     }
 
     let mut num_vertices = num_faces + planet.tiles.len();
@@ -171,20 +177,25 @@ fn generate_dual(terrain: Terrain, planet: Planet, generate_wireframe: bool) -> 
 
     sw.restart();
 
+    let (min_elevation, scale) = planet.get_elevation_scale();
+
     let mut vertex_index = 0;
     for tile in planet.tiles.iter() {
 
-        let normal = Vector3::from(&normalize(planet.vertices[tile.midpoint as usize].clone()));
+        let normal = Vector3::from(&planet.tile_normal(tile));
 
-        //let colour = 1.0 - tile.elevation.powf(1.5);
+        let colour = if show_plates {
+            let pid = if tile.plate_id == 0 {
+                0
+            } else {
+                (tile.plate_id - 1) % 15 + 1
+            };
 
-        let pid = if tile.plate_id == 0 {
-            0
+            (pid as f32 + 0.5) / 16.0
         } else {
-            (tile.plate_id - 1) % 15 + 1
+            let elevation = (planet.tile_elevation(tile) - min_elevation) / scale;
+            1.0 - elevation.powf(1.5)
         };
-
-        let colour = (pid as f32 + 0.5) / 16.0;
 
         let uv = Point2::new(colour.min(1.0).max(0.0), 0.10);
         let uv_outer = if generate_wireframe {
@@ -194,23 +205,23 @@ fn generate_dual(terrain: Terrain, planet: Planet, generate_wireframe: bool) -> 
         };
 
         // Center
-        mesh_vertices.push(Point3::from(&planet.vertices[tile.midpoint as usize]));
+        mesh_vertices.push(Point3::from(&planet.tile_midpoint(tile)));
         mesh_normals.push(normal);
         let center_uv = Point2::new(colour.min(1.0).max(0.0), 0.0);
         mesh_texcoords.push(center_uv);
 
         let mut n = 0;
-        for vi in tile.border.iter() {
-            mesh_vertices.push(Point3::from(&planet.vertices[*vi as usize]));
+        for v in planet.tile_border_points(tile).iter() {
+            mesh_vertices.push(Point3::from(v));
             mesh_normals.push(normal.clone());
             mesh_texcoords.push(uv_outer.clone());
             n += 1;
         }
 
         if generate_wireframe {
-            let mp = &planet.vertices[tile.midpoint as usize];
-            for vi in tile.border.iter() {
-                let delta = (&planet.vertices[*vi as usize] - mp) * 0.90 + mp;
+            let mp = planet.tile_midpoint(tile);
+            for v in planet.tile_border_points(tile).iter() {
+                let delta = (v - &mp) * 0.90 + &mp;
                 mesh_vertices.push(Point3::from(&delta));
                 mesh_normals.push(normal.clone());
                 mesh_texcoords.push(uv.clone());
@@ -285,4 +296,47 @@ fn generate_dual(terrain: Terrain, planet: Planet, generate_wireframe: bool) -> 
     debug!("  Creating mesh object in {} ms", sw.elapsed_ms());
 
     r
+}
+
+pub fn generate_plate_vectors(planet: &Planet) -> (Vec<Point3<f32>>, Vec<Point3<u32>>) {
+    let mut vertices = Vec::new();
+    let mut indices = Vec::new();
+    for tile in planet.tiles.iter() {
+        let a = planet.tile_midpoint(tile);
+        let b = &a + &tile.movement_vector;
+        indices.push(vertices.len() as u32);
+        vertices.push(Point3::from(&a));
+        indices.push(vertices.len() as u32);
+        vertices.push(Point3::from(&b));
+    }
+
+    (vertices, encode_wireframes(&indices).unwrap())
+}
+
+#[allow(dead_code)]
+fn encode_wireframes(wireframes: &Vec<u32>) -> Option<Vec<Point3<u32>>> {
+    let num_points = wireframes.len();
+    if num_points == 0 {
+        None
+    } else {
+        let mut encoded = Vec::with_capacity(num_points / 3 + 1);
+        let mut i = 0;
+        while i < num_points - 3 {
+            let tri = Point3::new(wireframes[i], wireframes[i + 1], wireframes[i + 2]);
+            encoded.push(tri);
+            i += 3;
+        }
+        match num_points - i {
+            2 => {
+                let tri = Point3::new(wireframes[i], wireframes[i + 1], 0);
+                encoded.push(tri);
+            }
+            1 => {
+                let tri = Point3::new(wireframes[i], 0, 0);
+                encoded.push(tri);
+            }
+            _ => {}
+        }
+        Some(encoded)
+    }
 }

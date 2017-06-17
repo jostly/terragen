@@ -18,7 +18,7 @@ use kiss3d::window::Window;
 use kiss3d::light::Light;
 use kiss3d::camera::ArcBall;
 use kiss3d::scene::SceneNode;
-use kiss3d::resource::Mesh;
+use kiss3d::resource::{Mesh, Material};
 use kiss3d::text::Font;
 
 use glfw::{Action, Key, WindowEvent};
@@ -28,6 +28,7 @@ use stopwatch::Stopwatch;
 use terrain::Terrain;
 use terrain::planet::Planet;
 use geom::*;
+use render::WireframeMaterial;
 
 use std::rc::Rc;
 use std::cell::RefCell;
@@ -55,15 +56,20 @@ fn main() {
 
     window.set_light(Light::StickToCamera);
 
+
+    let wireframe_material = Rc::new(RefCell::new(Box::new(WireframeMaterial::new()) as
+                                                  Box<Material + 'static>));
+
     let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.001);
 
     let mut grp = window.add_group();
     let mut terrain_node: Option<SceneNode> = None;
 
-    let mut generator = Generator::Dual;
+    let generators = [Generator::Dual, Generator::Plates];
+    let mut generator_index = 0;
     let mut regenerate_mesh = true;
     let mut use_wireframe = true;
-    let mut rotate = true;
+    let mut rotate = false;
     let mut current_level = 0;
     let mut num_tiles = 0;
 
@@ -138,11 +144,7 @@ fn main() {
                     }
                 }
                 WindowEvent::Key(Key::D, _, Action::Release, _) => {
-                    if generator == Generator::Regular {
-                        generator = Generator::Dual;
-                    } else {
-                        generator = Generator::Regular;
-                    }
+                    generator_index = (generator_index + 1) % generators.len();
                     regenerate_mesh = true;
                     event.inhibited = true
                 }
@@ -175,22 +177,26 @@ fn main() {
         if regenerate_mesh {
             if let Some(ico) = terrain {
                 let mut p = planet.unwrap_or_else(|| ico.to_planet());
-                p.assign_plates();
-                generate(generator, ico, p, use_wireframe, &tx);
+                generate(generators[generator_index], ico, p, use_wireframe, &tx);
                 terrain = None;
                 planet = None;
             }
             regenerate_mesh = false;
         }
         match rx.try_recv() {
-            Ok(Message::Complete(mut vertices, faces, normals, texcoords, terr, pla)) => {
+            Ok(Message::Complete(vertices, faces, normals, texcoords, terr, pla)) => {
                 if let Some(mut c) = terrain_node {
                     window.remove(&mut c);
                 }
-                for v in vertices.iter_mut() {
-                    *v = *v * 10.0;
-                }
-                terrain_node = Some(add_mesh(&mut grp, vertices, faces, normals, texcoords));
+                let (wirecoords, wirefaces) = generate_plate_vectors(&pla);
+                terrain_node = Some(add_mesh(generators[generator_index],
+                                             &mut grp,
+                                             vertices,
+                                             faces,
+                                             normals,
+                                             texcoords,
+                                             Some((wirecoords, wirefaces)),
+                                             wireframe_material.clone()));
                 terrain = Some(terr);
                 planet = Some(pla);
             }
@@ -203,21 +209,37 @@ fn main() {
 
 }
 
-fn add_mesh(parent: &mut SceneNode,
+fn add_mesh(generator: Generator,
+            parent: &mut SceneNode,
             vertices: Vec<Point3<f32>>,
             faces: Vec<Point3<u32>>,
             normals: Option<Vec<Vector3<f32>>>,
-            texcoords: Option<Vec<Point2<f32>>>)
+            texcoords: Option<Vec<Point2<f32>>>,
+            wireframes: Option<(Vec<Point3<f32>>, Vec<Point3<u32>>)>,
+            wireframe_material: Rc<RefCell<Box<Material + 'static>>>)
             -> SceneNode {
     let mut grp = parent.add_group();
+    if let Some((line_verts, line_faces)) = wireframes {
+        let mesh = Mesh::new(line_verts, line_faces, None, None, false);
+        let mesh = Rc::new(RefCell::new(mesh));
+        let scale = 1.001;
+        let mut c = grp.add_mesh(mesh, Vector3::new(scale, scale, scale));
 
+        c.set_color(0.0, 0.0, 0.0);
+        c.set_lines_width(2.0);
+        c.set_material(wireframe_material);
+    }
     let mesh = Mesh::new(vertices, faces, normals, texcoords, false);
     let mesh = Rc::new(RefCell::new(mesh));
 
     let mut c = grp.add_mesh(mesh.clone(), Vector3::new(1.0, 1.0, 1.0));
 
     c.set_color(1.0, 1.0, 1.0);
-    c.set_texture_from_file(&Path::new("media/groups.png"), "colour_ramp");
+    if generator == Generator::Plates {
+        c.set_texture_from_file(&Path::new("media/groups.png"), "colour_ramp");
+    } else {
+        c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");
+    }
     c.enable_backface_culling(true);
 
     grp

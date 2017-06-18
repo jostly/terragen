@@ -1,5 +1,6 @@
 mod border;
 mod plate;
+mod tile;
 
 use math::{Vec3, DotProduct};
 use math::{normalize, sorted_pair};
@@ -13,47 +14,12 @@ use rand::distributions::{IndependentSample, Range};
 
 pub use self::plate::Plate;
 pub use self::border::Border;
+pub use self::tile::Tile;
 
 pub type Vertex = Vec3<f32>;
 pub type VertexIndex = u32;
 pub type TileIndex = u32;
 pub type BorderIndex = u32;
-
-#[derive(Clone, Debug)]
-pub struct Tile {
-    pub vertices: Vec<VertexIndex>,
-    pub midpoint: VertexIndex,
-    pub borders: Vec<BorderIndex>,
-    pub plate_id: u32,
-    pub movement_vector: Vec3<f32>,
-}
-
-impl Tile {
-    pub fn new(vertices: Vec<VertexIndex>, midpoint: VertexIndex) -> Tile {
-        Tile {
-            vertices: vertices,
-            midpoint: midpoint,
-            borders: Vec::new(),
-            plate_id: 0,
-            movement_vector: Vec3::origo(),
-        }
-    }
-
-    fn index_of(&self, a: VertexIndex) -> Option<usize> {
-        self.vertices.iter().position(|x| *x == a)
-    }
-
-    pub fn has_edge(&self, a: VertexIndex, b: VertexIndex) -> bool {
-        if let Some(idx) = self.index_of(a) {
-            let n = self.vertices.len();
-            let before = (idx + n - 1) % n;
-            let after = (idx + 1) % n;
-            self.vertices[before] == b || self.vertices[after] == b
-        } else {
-            false
-        }
-    }
-}
 
 pub struct Planet {
     pub vertices: Vec<Vertex>,

@@ -30,13 +30,13 @@ pub enum Message {
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
 #[allow(dead_code)]
-pub enum Generator {
+pub enum Visualization {
     Regular,
     Dual,
     Plates,
 }
 
-pub fn generate(generator: Generator,
+pub fn generate(visualization: Visualization,
                 terrain: Terrain,
                 planet: Planet,
                 generate_wireframe: bool,
@@ -44,10 +44,10 @@ pub fn generate(generator: Generator,
     let channel = tx.clone();
     thread::spawn(move || {
         let sw = Stopwatch::start_new();
-        let mess = match generator {
-            Generator::Regular => generate_regular(terrain, planet),
-            Generator::Dual => generate_dual(terrain, planet, generate_wireframe, false),
-            Generator::Plates => generate_dual(terrain, planet, generate_wireframe, true),
+        let mess = match visualization {
+            Visualization::Regular => generate_regular(terrain, planet),
+            Visualization::Dual => generate_dual(terrain, planet, generate_wireframe, false),
+            Visualization::Plates => generate_dual(terrain, planet, generate_wireframe, true),
         };
         info!("Generating mesh took {} ms", sw.elapsed_ms());
         // (3568 ms, lvl 6)

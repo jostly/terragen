@@ -65,8 +65,8 @@ fn main() {
     let mut grp = window.add_group();
     let mut terrain_node: Option<SceneNode> = None;
 
-    let generators = [Generator::Dual, Generator::Plates];
-    let mut generator_index = 0;
+    let visualization_types = [Visualization::Dual, Visualization::Plates];
+    let mut visualization_index = 0;
     let mut regenerate_mesh = true;
     let mut use_wireframe = true;
     let mut rotate = false;
@@ -144,7 +144,7 @@ fn main() {
                     }
                 }
                 WindowEvent::Key(Key::D, _, Action::Release, _) => {
-                    generator_index = (generator_index + 1) % generators.len();
+                    visualization_index = (visualization_index + 1) % visualization_types.len();
                     regenerate_mesh = true;
                     event.inhibited = true
                 }
@@ -177,7 +177,7 @@ fn main() {
         if regenerate_mesh {
             if let Some(ico) = terrain {
                 let p = planet.unwrap_or_else(|| ico.to_planet());
-                generate(generators[generator_index], ico, p, use_wireframe, &tx);
+                generate(visualization_types[visualization_index], ico, p, use_wireframe, &tx);
                 terrain = None;
                 planet = None;
             }
@@ -189,7 +189,7 @@ fn main() {
                     window.remove(&mut c);
                 }
                 let (wirecoords, wirefaces) = generate_plate_vectors(&pla);
-                terrain_node = Some(add_mesh(generators[generator_index],
+                terrain_node = Some(add_mesh(visualization_types[visualization_index],
                                              &mut grp,
                                              vertices,
                                              faces,
@@ -209,7 +209,7 @@ fn main() {
 
 }
 
-fn add_mesh(generator: Generator,
+fn add_mesh(visualization: Visualization,
             parent: &mut SceneNode,
             vertices: Vec<Point3<f32>>,
             faces: Vec<Point3<u32>>,
@@ -235,7 +235,7 @@ fn add_mesh(generator: Generator,
     let mut c = grp.add_mesh(mesh.clone(), Vector3::new(1.0, 1.0, 1.0));
 
     c.set_color(1.0, 1.0, 1.0);
-    if generator == Generator::Plates {
+    if visualization == Visualization::Plates {
         c.set_texture_from_file(&Path::new("media/groups.png"), "colour_ramp");
     } else {
         c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");

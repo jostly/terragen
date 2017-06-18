@@ -15,4 +15,14 @@ impl Border {
             tiles: sorted_pair(ta, tb),
         }
     }
+
+    pub fn other_tile(&self, tile_index: TileIndex) -> Option<TileIndex> {
+        if self.tiles.0 == tile_index {
+            Some(self.tiles.1)
+        } else if self.tiles.1 == tile_index {
+            Some(self.tiles.0)
+        } else {
+            None
+        }
+    }
 }

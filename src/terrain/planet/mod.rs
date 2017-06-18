@@ -85,22 +85,20 @@ impl Planet {
         let mut tile_neighbours = vec![vec!(); tiles.len()];
 
         // Build tile neighbour map
-        for tile_idxs in vertex_tiles.iter() {
-            for tidx in tile_idxs.iter() {
-                let tile = &tiles[*tidx as usize];
-                for (b, a) in tile.vertex_pairs() {
-                    if let Some(other) =
-                        tile_idxs
-                            .iter()
-                            .find(|t| **t != *tidx && tiles[**t as usize].has_edge(*a, *b)) {
-                        let tn = &mut tile_neighbours[*tidx as usize];
-                        if !tn.contains(other) {
-                            tn.push(*other);
-                        }
+        for (tidx, tile) in tiles.iter().enumerate() {
+            for border_idx in tile.borders.iter() {
+                let border = &borders_vec[*border_idx as usize];
+                if let Some(other) = border.other_tile(tidx as u32) {
+                    let tn = &mut tile_neighbours[tidx];
+                    if !tn.contains(&other) {
+                        tn.push(other);
                     }
+                } else {
+                    panic!("Tile #{} links to border #{}, but the latter does not link back", tidx, border_idx);
                 }
             }
         }
+
         /*
         for (idx, tile_idxs) in vertex_tiles.iter().enumerate() {
             println!("Vertex {} -> {:?}", idx, tile_idxs);

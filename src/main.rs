@@ -176,7 +176,11 @@ fn main() {
         if regenerate_mesh {
             if let Some(gen) = generator {
                 let p = planet.unwrap_or_else(|| gen.to_planet());
-                generate(visualization_types[visualization_index], gen, p, use_wireframe, &tx);
+                generate(visualization_types[visualization_index],
+                         gen,
+                         p,
+                         use_wireframe,
+                         &tx);
                 generator = None;
                 planet = None;
             }
@@ -189,13 +193,13 @@ fn main() {
                 }
                 let (wirecoords, wirefaces) = generate_plate_vectors(&pla);
                 planet_node = Some(add_mesh(visualization_types[visualization_index],
-                                             &mut grp,
-                                             vertices,
-                                             faces,
-                                             normals,
-                                             texcoords,
-                                             Some((wirecoords, wirefaces)),
-                                             wireframe_material.clone()));
+                                            &mut grp,
+                                            vertices,
+                                            faces,
+                                            normals,
+                                            texcoords,
+                                            Some((wirecoords, wirefaces)),
+                                            wireframe_material.clone()));
                 generator = Some(terr);
                 planet = Some(pla);
             }

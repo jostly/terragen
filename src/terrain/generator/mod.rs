@@ -1,11 +1,19 @@
+mod edge;
+mod face;
+mod node;
+
 use math::*;
-use terrain::{Edge, Face, Node, Index3, Vertex};
 use terrain::planet::Planet;
+use terrain::types::{Vertex, Index3};
 
 use rand::{random, thread_rng};
 use rand::distributions::{IndependentSample, Range};
 use std::f32;
 use std::collections::HashMap;
+
+pub use self::edge::Edge;
+pub use self::face::Face;
+pub use self::node::Node;
 
 #[derive(Clone)]
 pub struct Terrain {

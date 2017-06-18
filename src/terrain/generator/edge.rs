@@ -1,3 +1,5 @@
+use math::sorted_pair;
+
 #[derive(Clone, Debug)]
 pub struct Edge {
     pub a: u32,
@@ -7,14 +9,11 @@ pub struct Edge {
 
 impl Edge {
     pub fn new(a: u32, b: u32) -> Edge {
-        if a <= b {
-            Edge {
-                a: a,
-                b: b,
-                faces: Vec::new(),
-            }
-        } else {
-            Edge::new(b, a)
+        let (a, b) = sorted_pair(a, b);
+        Edge {
+            a: a,
+            b: b,
+            faces: Vec::new(),
         }
     }
 

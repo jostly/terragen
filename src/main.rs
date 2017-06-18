@@ -25,7 +25,7 @@ use glfw::{Action, Key, WindowEvent};
 
 use stopwatch::Stopwatch;
 
-use terrain::Terrain;
+use terrain::generator::Terrain;
 use terrain::planet::Planet;
 use geom::*;
 use render::WireframeMaterial;

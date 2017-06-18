@@ -1,4 +1,4 @@
-use terrain::Vertex;
+use terrain::types::Vertex;
 
 #[derive(Clone, Debug)]
 pub struct Node {

@@ -1,4 +1,4 @@
-use terrain::Index3;
+use terrain::types::Index3;
 
 #[derive(Clone, Debug)]
 pub struct Face {

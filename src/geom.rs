@@ -1,5 +1,5 @@
 use math::{Vec3, normalize};
-use terrain::Terrain;
+use terrain::generator::Terrain;
 use terrain::planet::Planet;
 use na::{Vector3, Point3, Point2};
 use stopwatch::Stopwatch;

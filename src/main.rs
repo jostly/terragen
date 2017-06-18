@@ -176,7 +176,7 @@ fn main() {
         }
         if regenerate_mesh {
             if let Some(ico) = terrain {
-                let mut p = planet.unwrap_or_else(|| ico.to_planet());
+                let p = planet.unwrap_or_else(|| ico.to_planet());
                 generate(generators[generator_index], ico, p, use_wireframe, &tx);
                 terrain = None;
                 planet = None;

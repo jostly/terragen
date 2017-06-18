@@ -1,13 +1,16 @@
+mod plate;
+
 use math::{Vec3, DotProduct};
 use math::normalize;
 
 use std::f32;
-use std::iter;
 use std::collections::HashMap;
 
 use rand::thread_rng;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
+
+pub use self::plate::Plate;
 
 pub type Vertex = Vec3<f32>;
 pub type VertexIndex = u32;
@@ -66,64 +69,6 @@ impl Tile {
         } else {
             false
         }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Plate {
-    id: u32,
-    tiles: Vec<TileIndex>,
-    base_elevation: f32,
-    axis_of_rotation: Vec3<f32>,
-    angular_velocity: f32,
-}
-
-impl Plate {
-    pub fn new(id: u32) -> Plate {
-        let mut rng = thread_rng();
-        let ocean_ratio = 0.6;
-        let base_elevation = if rng.next_f32() < ocean_ratio {
-            let between = Range::new(-500.0, -100.0);
-            between.ind_sample(&mut rng)
-        } else {
-            let between = Range::new(-50.0, 250.0);
-            between.ind_sample(&mut rng)
-        };
-        let between = Range::new(-1.0, 1.0);
-        let mut axis = Vec3::origo();
-        while axis.length() < 0.01 {
-            axis.x = between.ind_sample(&mut rng);
-            axis.y = between.ind_sample(&mut rng);
-            axis.z = between.ind_sample(&mut rng);
-        }
-        axis = normalize(axis);
-        let rotation_speed = Range::new(0.1, 0.4).ind_sample(&mut rng);
-        Plate {
-            id: id,
-            tiles: Vec::new(),
-            base_elevation: base_elevation,
-            axis_of_rotation: axis,
-            angular_velocity: rotation_speed,
-        }
-    }
-
-    #[allow(dead_code)]
-    pub fn center(&self, planet: &Planet) -> Vertex {
-        let mut midpoint = Vec3::origo();
-        if !self.tiles.is_empty() {
-            for tile_idx in self.tiles.iter() {
-                let tile = &planet.tiles[*tile_idx as usize];
-                let point = &planet.vertices[tile.midpoint as usize];
-                midpoint += point;
-            }
-            normalize(midpoint)
-        } else {
-            midpoint
-        }
-    }
-
-    pub fn add_tile(&mut self, tile_idx: TileIndex) {
-        self.tiles.push(tile_idx);
     }
 }
 
@@ -323,7 +268,8 @@ impl Planet {
             for tile_idx in corner.iter() {
                 plate.add_tile(*tile_idx);
                 self.assign_plate_to_tile(&plate, *tile_idx);
-                self.tiles[*tile_idx as usize].plate_id = plate.id;
+                let tile = &mut self.tiles[*tile_idx as usize];
+                tile.plate_id = plate.id;
             }
 
             for tile_idx in corner.iter() {
@@ -371,7 +317,8 @@ impl Planet {
 
         for plate in self.plates.iter() {
             for tile_idx in plate.tiles.iter() {
-                self.tiles[*tile_idx as usize].plate_id = plate.id;
+                let tile = &mut self.tiles[*tile_idx as usize];
+                tile.plate_id = plate.id;
             }
         }
         self

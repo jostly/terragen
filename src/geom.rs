@@ -29,6 +29,7 @@ pub enum Message {
 }
 
 #[derive(PartialEq, Eq, Debug, Copy, Clone)]
+#[allow(dead_code)]
 pub enum Generator {
     Regular,
     Dual,

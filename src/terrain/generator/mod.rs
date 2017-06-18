@@ -494,7 +494,7 @@ impl Generator {
 
         for (i, node) in self.nodes.iter().enumerate() {
             let node_index = i as u32;
-            let mut border = Vec::with_capacity(node.faces.len());
+            let mut border = Vec::with_capacity(node.faces.len() + 1);
 
             let mut face_index = node.faces[0];
             let mut midpoint = Vec3::new(0.0, 0.0, 0.0);

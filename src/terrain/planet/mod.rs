@@ -52,16 +52,11 @@ impl Planet {
         }
 
         for (idx, tile) in tiles.iter().enumerate() {
-            let mut prev = *tile.vertices.last().unwrap();
-            for vi in tile.vertices.iter() {
-                let curr = *vi;
-
-                let pair = sorted_pair(curr, prev);
+            for (curr, prev) in tile.vertex_pairs() {
+                let pair = sorted_pair(*curr, *prev);
 
                 let mut tiles = borders_map.entry(pair).or_insert(Vec::new());
                 tiles.push(idx as u32);
-
-                prev = curr;
             }
         }
 
@@ -82,30 +77,27 @@ impl Planet {
         let mut vertex_tiles = vec![vec!(); num_corners];
 
         for (idx, tile) in tiles.iter().enumerate() {
-            for vi in tile.vertices.iter() {
+            for vi in tile.vertices_iter() {
                 vertex_tiles[*vi as usize].push(idx as TileIndex);
             }
         }
 
         let mut tile_neighbours = vec![vec!(); tiles.len()];
 
+        // Build tile neighbour map
         for tile_idxs in vertex_tiles.iter() {
             for tidx in tile_idxs.iter() {
                 let tile = &tiles[*tidx as usize];
-                let mut a = tile.vertices[0];
-                let n = tile.vertices.len();
-                for j in 0..n {
-                    let b = tile.vertices[(j + 1) % n];
+                for (b, a) in tile.vertex_pairs() {
                     if let Some(other) =
                         tile_idxs
                             .iter()
-                            .find(|t| **t != *tidx && tiles[**t as usize].has_edge(a, b)) {
+                            .find(|t| **t != *tidx && tiles[**t as usize].has_edge(*a, *b)) {
                         let tn = &mut tile_neighbours[*tidx as usize];
                         if !tn.contains(other) {
                             tn.push(*other);
                         }
                     }
-                    a = b;
                 }
             }
         }
@@ -157,8 +149,7 @@ impl Planet {
     }
 
     pub fn tile_border_points(&self, tile: &Tile) -> Vec<Vertex> {
-        tile.vertices
-            .iter()
+        tile.vertices_iter()
             .map(|vi| &self.vertices[*vi as usize] * self.scale)
             .collect()
     }
@@ -166,7 +157,7 @@ impl Planet {
     pub fn tile_elevation(&self, tile: &Tile) -> f32 {
         let mut elevation = 0.0;
         let mut n = 0;
-        for vi in tile.vertices.iter() {
+        for vi in tile.vertices_iter() {
             elevation += self.elevations[*vi as usize];
             n += 1;
         }

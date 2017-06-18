@@ -142,7 +142,7 @@ fn generate_dual(generator: Generator,
     let mut num_faces = 0;
 
     for tile in planet.tiles_iter() {
-        num_faces += tile.vertices.len();
+        num_faces += tile.num_vertices();
     }
 
     let mut num_vertices = num_faces + planet.num_tiles();

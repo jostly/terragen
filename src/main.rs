@@ -25,7 +25,7 @@ use glfw::{Action, Key, WindowEvent};
 
 use stopwatch::Stopwatch;
 
-use terrain::generator::Terrain;
+use terrain::generator::Generator;
 use terrain::planet::Planet;
 use geom::*;
 use render::WireframeMaterial;
@@ -42,8 +42,8 @@ fn main() {
 
     let (tx, rx) = channel();
 
-    let terr = Terrain::new();
-    let mut terrain: Option<Terrain> = Some(terr);
+    let terr = Generator::new();
+    let mut generator: Option<Generator> = Some(terr);
     let mut planet: Option<Planet> = None;
 
     let mut window = Window::new_with_size("Terragen", 900, 900);
@@ -56,14 +56,13 @@ fn main() {
 
     window.set_light(Light::StickToCamera);
 
-
     let wireframe_material = Rc::new(RefCell::new(Box::new(WireframeMaterial::new()) as
                                                   Box<Material + 'static>));
 
     let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.001);
 
     let mut grp = window.add_group();
-    let mut terrain_node: Option<SceneNode> = None;
+    let mut planet_node: Option<SceneNode> = None;
 
     let visualization_types = [Visualization::Dual, Visualization::Plates];
     let mut visualization_index = 0;
@@ -76,8 +75,8 @@ fn main() {
     while window.render_with_camera(&mut arc_ball) {
         let text_point = Point2::new(50.0, 50.0);
 
-        if let Some(ref terr) = terrain {
-            current_level = terr.current_level();
+        if let Some(ref gen) = generator {
+            current_level = gen.current_level();
         }
         if let Some(ref pla) = planet {
             num_tiles = pla.num_tiles;
@@ -90,10 +89,10 @@ fn main() {
         for mut event in window.events().iter() {
             match event.value {
                 WindowEvent::Key(Key::Space, _, Action::Release, _) => {
-                    if let Some(ref mut ico) = terrain {
-                        info!("Subdividing a level {} terrain", ico.current_level());
+                    if let Some(ref mut gen) = generator {
+                        info!("Subdividing a level {} terrain", gen.current_level());
                         let sw = Stopwatch::start_new();
-                        ico.subdivide();
+                        gen.subdivide();
                         planet = None;
                         info!("Subdivision took {} ms", sw.elapsed_ms());
                         // (1744 ms, lvl 6), (7401 ms, lvl 7)
@@ -102,16 +101,16 @@ fn main() {
                     }
                 }
                 WindowEvent::Key(Key::A, _, Action::Release, _) => {
-                    if let Some(ref mut ico) = terrain {
+                    if let Some(ref mut gen) = generator {
                         let topology_distortion_rate = 0.04; // 0 - 0.15
                         let mut total_distortion =
-                            (ico.num_edges() as f32 * topology_distortion_rate).ceil() as u32;
+                            (gen.num_edges() as f32 * topology_distortion_rate).ceil() as u32;
                         let mut iterations = 6;
                         while iterations > 0 {
                             let iteration_distortion = total_distortion / iterations;
                             total_distortion -= iteration_distortion;
-                            ico.distort(iteration_distortion);
-                            ico.relax(0.);
+                            gen.distort(iteration_distortion);
+                            gen.relax(0.);
                             iterations -= 1;
                         }
                         planet = None;
@@ -120,15 +119,15 @@ fn main() {
                     }
                 }
                 WindowEvent::Key(Key::S, _, Action::Release, _) => {
-                    if let Some(ref mut ico) = terrain {
+                    if let Some(ref mut gen) = generator {
                         let max_relax = 300;
                         let mut last_move = f32::MAX;
                         let mut i = 1;
-                        let num_nodes = ico.num_nodes() as f32;
+                        let num_nodes = gen.num_nodes() as f32;
                         let average_node_radius = (f32::consts::PI * 4.0 / num_nodes).sqrt();
                         let min_shift_delta = average_node_radius * num_nodes / 500000.0;
                         while i <= max_relax {
-                            let rel = ico.relax(0.5);
+                            let rel = gen.relax(0.5);
                             debug!("Relaxation iteration {}: {}", i, rel);
                             let diff = (last_move - rel).abs();
                             if diff < min_shift_delta {
@@ -175,21 +174,21 @@ fn main() {
             }
         }
         if regenerate_mesh {
-            if let Some(ico) = terrain {
-                let p = planet.unwrap_or_else(|| ico.to_planet());
-                generate(visualization_types[visualization_index], ico, p, use_wireframe, &tx);
-                terrain = None;
+            if let Some(gen) = generator {
+                let p = planet.unwrap_or_else(|| gen.to_planet());
+                generate(visualization_types[visualization_index], gen, p, use_wireframe, &tx);
+                generator = None;
                 planet = None;
             }
             regenerate_mesh = false;
         }
         match rx.try_recv() {
             Ok(Message::Complete(vertices, faces, normals, texcoords, terr, pla)) => {
-                if let Some(mut c) = terrain_node {
+                if let Some(mut c) = planet_node {
                     window.remove(&mut c);
                 }
                 let (wirecoords, wirefaces) = generate_plate_vectors(&pla);
-                terrain_node = Some(add_mesh(visualization_types[visualization_index],
+                planet_node = Some(add_mesh(visualization_types[visualization_index],
                                              &mut grp,
                                              vertices,
                                              faces,
@@ -197,7 +196,7 @@ fn main() {
                                              texcoords,
                                              Some((wirecoords, wirefaces)),
                                              wireframe_material.clone()));
-                terrain = Some(terr);
+                generator = Some(terr);
                 planet = Some(pla);
             }
             _ => {}

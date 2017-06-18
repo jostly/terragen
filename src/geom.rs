@@ -1,5 +1,5 @@
 use math::{Vec3, normalize};
-use terrain::generator::Terrain;
+use terrain::generator::Generator;
 use terrain::planet::Planet;
 use na::{Vector3, Point3, Point2};
 use stopwatch::Stopwatch;
@@ -24,7 +24,7 @@ pub enum Message {
              Vec<Point3<u32>>,
              Option<Vec<Vector3<f32>>>,
              Option<Vec<Point2<f32>>>,
-             Terrain,
+             Generator,
              Planet),
 }
 
@@ -37,7 +37,7 @@ pub enum Visualization {
 }
 
 pub fn generate(visualization: Visualization,
-                terrain: Terrain,
+                generator: Generator,
                 planet: Planet,
                 generate_wireframe: bool,
                 tx: &Sender<Message>) {
@@ -45,9 +45,9 @@ pub fn generate(visualization: Visualization,
     thread::spawn(move || {
         let sw = Stopwatch::start_new();
         let mess = match visualization {
-            Visualization::Regular => generate_regular(terrain, planet),
-            Visualization::Dual => generate_dual(terrain, planet, generate_wireframe, false),
-            Visualization::Plates => generate_dual(terrain, planet, generate_wireframe, true),
+            Visualization::Regular => generate_regular(generator, planet),
+            Visualization::Dual => generate_dual(generator, planet, generate_wireframe, false),
+            Visualization::Plates => generate_dual(generator, planet, generate_wireframe, true),
         };
         info!("Generating mesh took {} ms", sw.elapsed_ms());
         // (3568 ms, lvl 6)
@@ -66,30 +66,30 @@ fn elevation_to_uv(elevation: f32, min_elev: f32, max_elev: f32) -> Point2<f32> 
     Point2::new(1.0 - scaled_elev.powf(1.5), 0.0)
 }
 
-fn generate_regular(ico: Terrain, planet: Planet) -> Message {
-    let num_faces = ico.faces.len();
+fn generate_regular(generator: Generator, planet: Planet) -> Message {
+    let num_faces = generator.faces.len();
     let num_vertices = num_faces * 3;
-    let (min_elev, max_elev) = ico.calculate_elevations();
+    let (min_elev, max_elev) = generator.calculate_elevations();
     let mut vertices = Vec::with_capacity(num_vertices);
     let mut normals = Vec::with_capacity(num_vertices);
     let mut texcoords = Vec::with_capacity(num_vertices);
     let mut faces = Vec::with_capacity(num_faces);
 
     {
-        let ico_faces = &ico.faces;
-        let ico_vertices = &ico.nodes;
+        let gen_faces = &generator.faces;
+        let gen_vertices = &generator.nodes;
 
         let mut vert_index = 0u32;
-        for f in ico_faces.iter() {
+        for f in gen_faces.iter() {
             let mut average_elevation = 0.0;
             for idx in [f.points.x, f.points.y, f.points.z].iter() {
-                let ref vert = ico_vertices[*idx as usize];
+                let ref vert = gen_vertices[*idx as usize];
                 average_elevation += vert.elevation;
                 //let vertex_scale = (elevation.powi(2) - 0.5) * 0.02;
                 let vertex = &vert.point; // * (1.0 + vertex_scale);
 
                 vertices.push(Point3::from(vertex));
-                let normal = normalize(ico.face_midpoint(f));
+                let normal = normalize(generator.face_midpoint(f));
                 normals.push(Vector3::from(&normal));
             }
             let uv = elevation_to_uv(average_elevation / 3.0, min_elev, max_elev);
@@ -102,7 +102,7 @@ fn generate_regular(ico: Terrain, planet: Planet) -> Message {
         }
     }
 
-    Message::Complete(vertices, faces, Some(normals), Some(texcoords), ico, planet)
+    Message::Complete(vertices, faces, Some(normals), Some(texcoords), generator, planet)
 }
 /*
 
@@ -129,7 +129,7 @@ fn generate_regular(ico: Terrain, planet: Planet) -> Message {
 
  */
 
-fn generate_dual(terrain: Terrain,
+fn generate_dual(generator: Generator,
                  planet: Planet,
                  generate_wireframe: bool,
                  show_plates: bool)
@@ -291,7 +291,7 @@ fn generate_dual(terrain: Terrain,
                               mesh_faces,
                               Some(mesh_normals),
                               Some(mesh_texcoords),
-                              terrain,
+                              generator,
                               planet);
 
     debug!("  Creating mesh object in {} ms", sw.elapsed_ms());

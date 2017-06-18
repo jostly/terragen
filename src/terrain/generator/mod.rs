@@ -16,7 +16,7 @@ pub use self::face::Face;
 pub use self::node::Node;
 
 #[derive(Clone)]
-pub struct Terrain {
+pub struct Generator {
     pub nodes: Vec<Node>,
     pub edges: Vec<Edge>,
     pub faces: Vec<Face>,
@@ -24,8 +24,8 @@ pub struct Terrain {
     level: u8,
 }
 
-impl Terrain {
-    pub fn new() -> Terrain {
+impl Generator {
+    pub fn new() -> Generator {
         let phi = ((5.0f32).sqrt() + 1.0) / 2.0;
         let du = 1.0 / (phi * phi + 1.0).sqrt();
         let dv = phi * du;
@@ -100,10 +100,10 @@ impl Terrain {
                          Face::new(Index3::new(6, 8, 9), Index3::new(24, 28, 25)),
                          Face::new(Index3::new(7, 11, 10), Index3::new(27, 29, 26))];
 
-        Terrain::assign_links_to_nodes(&mut nodes, &edges, &faces);
-        Terrain::assign_links_to_edges(&mut edges, &faces);
+        Generator::assign_links_to_nodes(&mut nodes, &edges, &faces);
+        Generator::assign_links_to_edges(&mut edges, &faces);
 
-        Terrain {
+        Generator {
             nodes: nodes,
             edges: edges,
             faces: faces,
@@ -269,8 +269,8 @@ impl Terrain {
             }
         }
 
-        Terrain::assign_links_to_nodes(&mut self.nodes, &new_edges, &new_faces);
-        Terrain::assign_links_to_edges(&mut new_edges, &new_faces);
+        Generator::assign_links_to_nodes(&mut self.nodes, &new_edges, &new_faces);
+        Generator::assign_links_to_edges(&mut new_edges, &new_faces);
 
         self.edges = new_edges;
         self.faces = new_faces;
@@ -331,7 +331,7 @@ impl Terrain {
         let mut new_edge_0 = self.edges[new_edge_index_0 as usize].clone();
         let mut new_edge_1 = self.edges[new_edge_index_1 as usize].clone();
 
-        if !Terrain::rotation_predicate(&old_node_0, &old_node_1, &new_node_0, &new_node_1) {
+        if !Generator::rotation_predicate(&old_node_0, &old_node_1, &new_node_0, &new_node_1) {
             return false;
         }
 
@@ -557,21 +557,21 @@ mod tests {
 
     #[test]
     fn new_terrain_has_edges_for_all_nodes() {
-        let terr = Terrain::new();
+        let terr = Generator::new();
 
         verify_edges_for_nodes(&terr, 5, 5);
     }
 
     #[test]
     fn new_terrain_has_faces_for_all_nodes() {
-        let terr = Terrain::new();
+        let terr = Generator::new();
 
         verify_faces_for_nodes(&terr, 5, 5);
     }
 
     #[test]
     fn new_terrain_has_correct_face_to_edge_linkage() {
-        let terr = Terrain::new();
+        let terr = Generator::new();
 
         verify_faces_for_edges(&terr, 2, 2);
         verify_face_to_edge_link(&terr);
@@ -579,7 +579,7 @@ mod tests {
 
     #[test]
     fn subdivided_terrain_has_edges_for_all_nodes() {
-        let mut terr = Terrain::new();
+        let mut terr = Generator::new();
         terr.subdivide();
         terr.subdivide();
 
@@ -588,7 +588,7 @@ mod tests {
 
     #[test]
     fn subdivided_terrain_has_faces_for_all_nodes() {
-        let mut terr = Terrain::new();
+        let mut terr = Generator::new();
         terr.subdivide();
         terr.subdivide();
 
@@ -597,7 +597,7 @@ mod tests {
 
     #[test]
     fn subdivided_terrain_has_correct_face_to_edge_linkage() {
-        let mut terr = Terrain::new();
+        let mut terr = Generator::new();
         terr.subdivide();
         terr.subdivide();
 
@@ -605,7 +605,7 @@ mod tests {
         verify_face_to_edge_link(&terr);
     }
 
-    fn verify_edges_for_nodes(terr: &Terrain, min_edges: u32, max_edges: u32) {
+    fn verify_edges_for_nodes(terr: &Generator, min_edges: u32, max_edges: u32) {
         let num_nodes = terr.nodes.len();
         let mut seen_nodes = vec![Vec::new(); num_nodes];
 
@@ -653,7 +653,7 @@ mod tests {
         }
     }
 
-    fn verify_faces_for_nodes(terr: &Terrain, min_faces: u32, max_faces: u32) {
+    fn verify_faces_for_nodes(terr: &Generator, min_faces: u32, max_faces: u32) {
         let num_nodes = terr.nodes.len();
         let mut seen_nodes = vec![Vec::new(); num_nodes];
 
@@ -700,7 +700,7 @@ mod tests {
         }
     }
 
-    fn verify_faces_for_edges(terr: &Terrain, min_faces: u32, max_faces: u32) {
+    fn verify_faces_for_edges(terr: &Generator, min_faces: u32, max_faces: u32) {
         let num_edges = terr.edges.len();
         let mut seen_edges = vec![Vec::new(); num_edges];
 
@@ -747,7 +747,7 @@ mod tests {
         }
     }
 
-    fn verify_face_to_edge_link(terr: &Terrain) {
+    fn verify_face_to_edge_link(terr: &Generator) {
         for (i, f) in terr.faces.iter().enumerate() {
             let p0 = f.points.x;
             let p1 = f.points.y;

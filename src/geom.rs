@@ -141,11 +141,11 @@ fn generate_dual(generator: Generator,
 
     let mut num_faces = 0;
 
-    for tile in planet.tiles.iter() {
+    for tile in planet.tiles_iter() {
         num_faces += tile.vertices.len();
     }
 
-    let mut num_vertices = num_faces + planet.tiles.len();
+    let mut num_vertices = num_faces + planet.num_tiles();
     if generate_wireframe {
         num_vertices += num_faces;
         num_faces += num_faces * 2;
@@ -181,7 +181,7 @@ fn generate_dual(generator: Generator,
     let (min_elevation, scale) = planet.get_elevation_scale();
 
     let mut vertex_index = 0;
-    for tile in planet.tiles.iter() {
+    for tile in planet.tiles_iter() {
 
         let normal = Vector3::from(&planet.tile_normal(tile));
 
@@ -302,7 +302,7 @@ fn generate_dual(generator: Generator,
 pub fn generate_plate_vectors(planet: &Planet) -> (Vec<Point3<f32>>, Vec<Point3<u32>>) {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
-    for tile in planet.tiles.iter() {
+    for tile in planet.tiles_iter() {
         let a = planet.tile_midpoint(tile);
         let b = &a + &tile.movement_vector;
         indices.push(vertices.len() as u32);

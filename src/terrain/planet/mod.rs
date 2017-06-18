@@ -7,6 +7,7 @@ use math::{normalize, sorted_pair};
 
 use std::f32;
 use std::collections::HashMap;
+use std::slice::Iter;
 
 use rand::thread_rng;
 use rand::Rng;
@@ -22,15 +23,16 @@ pub type TileIndex = u32;
 pub type BorderIndex = u32;
 
 pub struct Planet {
-    pub vertices: Vec<Vertex>,
-    pub tiles: Vec<Tile>,
-    pub borders: Vec<Border>,
-    pub elevations: Vec<f32>,
-    pub vertex_to_tiles: Vec<Vec<TileIndex>>,
-    pub tile_neighbours: Vec<Vec<TileIndex>>,
-    pub num_corners: usize,
-    pub num_tiles: usize,
-    pub num_plates: usize,
+    vertices: Vec<Vertex>,
+    tiles: Vec<Tile>,
+    #[allow(dead_code)]
+    borders: Vec<Border>,
+    elevations: Vec<f32>,
+    vertex_to_tiles: Vec<Vec<TileIndex>>,
+    tile_neighbours: Vec<Vec<TileIndex>>,
+    num_corners: usize,
+    num_tiles: usize,
+    num_plates: usize,
     plates: Vec<Plate>,
     scale: f32,
 }
@@ -136,6 +138,14 @@ impl Planet {
         planet.grow_plates();
 
         planet
+    }
+
+    pub fn tiles_iter(&self) -> Iter<Tile> {
+        self.tiles.iter()
+    }
+
+    pub fn num_tiles(&self) -> usize {
+        self.num_tiles
     }
 
     pub fn tile_normal(&self, tile: &Tile) -> Vertex {
@@ -297,7 +307,7 @@ impl Planet {
     }
 
     pub fn merge_plates(&mut self) {
-        let min_plate_size = self.num_tiles / 30;
+        let min_plate_size = self.num_tiles() / 30;
         println!("Minimum plate size is {}", min_plate_size);
         let mut plates = self.plates.clone();
 

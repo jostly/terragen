@@ -79,7 +79,7 @@ fn main() {
             current_level = gen.current_level();
         }
         if let Some(ref pla) = planet {
-            num_tiles = pla.num_tiles;
+            num_tiles = pla.num_tiles();
         }
         window.draw_text(&format!("Level: {}\nTiles: {}", current_level, num_tiles),
                          &text_point,

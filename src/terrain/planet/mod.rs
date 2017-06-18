@@ -1,7 +1,8 @@
+mod border;
 mod plate;
 
 use math::{Vec3, DotProduct};
-use math::normalize;
+use math::{normalize, sorted_pair};
 
 use std::f32;
 use std::collections::HashMap;
@@ -11,30 +12,12 @@ use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 
 pub use self::plate::Plate;
+pub use self::border::Border;
 
 pub type Vertex = Vec3<f32>;
 pub type VertexIndex = u32;
 pub type TileIndex = u32;
 pub type BorderIndex = u32;
-
-#[derive(Clone, Debug)]
-pub struct Border {
-    pub vertices: (VertexIndex, VertexIndex),
-    pub tiles: (TileIndex, TileIndex),
-}
-
-impl Border {
-    pub fn new(va: VertexIndex, vb: VertexIndex, ta: TileIndex, tb: TileIndex) -> Border {
-        Border {
-            vertices: make_pair(va, vb),
-            tiles: make_pair(ta, tb),
-        }
-    }
-}
-
-fn make_pair(a: u32, b: u32) -> (u32, u32) {
-    if a <= b { (a, b) } else { (b, a) }
-}
 
 #[derive(Clone, Debug)]
 pub struct Tile {
@@ -105,7 +88,7 @@ impl Planet {
             for vi in tile.vertices.iter() {
                 let curr = *vi;
 
-                let pair = make_pair(curr, prev);
+                let pair = sorted_pair(curr, prev);
 
                 let mut tiles = borders_map.entry(pair).or_insert(Vec::new());
                 tiles.push(idx as u32);

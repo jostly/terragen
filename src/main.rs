@@ -7,6 +7,7 @@ extern crate log;
 extern crate env_logger;
 extern crate stopwatch;
 extern crate gl;
+extern crate noise;
 
 mod terrain;
 mod math;

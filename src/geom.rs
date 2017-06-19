@@ -6,6 +6,7 @@ use stopwatch::Stopwatch;
 
 use std::sync::mpsc::Sender;
 use std::thread;
+use std::f32;
 
 impl<'a> From<&'a Vec3<f32>> for Vector3<f32> {
     fn from(v: &'a Vec3<f32>) -> Self {
@@ -302,9 +303,14 @@ fn generate_dual(generator: Generator,
 pub fn generate_plate_vectors(planet: &Planet) -> (Vec<Point3<f32>>, Vec<Point3<u32>>) {
     let mut vertices = Vec::new();
     let mut indices = Vec::new();
+    let radius = 10.0;
+    let total_surface_area = 4.0 * f32::consts::PI * radius * radius;
+    let tile_surface_area = total_surface_area / planet.num_tiles() as f32;
+    let approximate_tile_radius = (tile_surface_area / f32::consts::PI).sqrt();
+    let vector_scale = approximate_tile_radius * 2.0;
     for tile in planet.tiles_iter() {
         let a = planet.tile_midpoint(tile);
-        let b = &a + &tile.movement_vector;
+        let b = &a + &tile.movement_vector * vector_scale;
         indices.push(vertices.len() as u32);
         vertices.push(Point3::from(&a));
         indices.push(vertices.len() as u32);

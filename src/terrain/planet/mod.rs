@@ -13,6 +13,8 @@ use rand::thread_rng;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 
+use noise::{Fbm, NoiseModule, MultiFractal, RidgedMulti};
+
 pub use self::plate::Plate;
 pub use self::border::Border;
 pub use self::tile::Tile;
@@ -21,6 +23,7 @@ pub type Vertex = Vec3<f32>;
 pub type VertexIndex = u32;
 pub type TileIndex = u32;
 pub type BorderIndex = u32;
+pub type PlateIndex = u32;
 
 pub struct Planet {
     vertices: Vec<Vertex>,
@@ -94,7 +97,9 @@ impl Planet {
                         tn.push(other);
                     }
                 } else {
-                    panic!("Tile #{} links to border #{}, but the latter does not link back", tidx, border_idx);
+                    panic!("Tile #{} links to border #{}, but the latter does not link back",
+                           tidx,
+                           border_idx);
                 }
             }
         }
@@ -111,11 +116,22 @@ impl Planet {
 
         }
 */
+
+        let mut fbm = RidgedMulti::new();
+        //fbm = fbm.set_frequency(7.5);
+
+        let mut elevations = Vec::with_capacity(num_corners);
+        for vert in vertices[0..num_corners].iter() {
+            let v = [vert.x, vert.y, vert.z];
+            let e = fbm.get(v) * 100.0;
+            elevations.push(e);
+        }
+
         let mut planet = Planet {
             vertices: vertices,
             tiles: tiles,
             borders: borders_vec,
-            elevations: vec![0.0; num_corners],
+            elevations: elevations,
             vertex_to_tiles: vertex_tiles,
             tile_neighbours: tile_neighbours,
             num_corners: num_corners,
@@ -178,6 +194,8 @@ impl Planet {
 
         let scale = max_elevation - min_elevation;
 
+        println!("Elevations: {} to {}", min_elevation, max_elevation);
+
         (min_elevation, scale)
     }
 
@@ -214,7 +232,7 @@ impl Planet {
             let mut plate = Plate::new(1 + plates.len() as u32);
 
             for tile_idx in corner.iter() {
-                plate.add_tile(*tile_idx);
+                plate.add_tile(*tile_idx, &self.tiles[*tile_idx as usize].borders);
                 self.assign_plate_to_tile(&plate, *tile_idx);
                 let tile = &mut self.tiles[*tile_idx as usize];
                 tile.plate_id = plate.id;
@@ -282,7 +300,8 @@ impl Planet {
 
             if self.tiles[tile_idx as usize].plate_id == 0 {
                 self.assign_plate_id_to_tile(plate_id, tile_idx);
-                self.plates[plate_id as usize - 1].add_tile(tile_idx);
+                self.plates[plate_id as usize - 1]
+                    .add_tile(tile_idx, &self.tiles[tile_idx as usize].borders);
                 for other_idx in self.tile_neighbours[tile_idx as usize].iter() {
                     let other_tile = &self.tiles[*other_idx as usize];
                     if other_tile.plate_id == 0 {

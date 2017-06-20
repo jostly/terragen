@@ -2,14 +2,13 @@ use math::Vec3;
 use math::normalize;
 
 use std::f32;
-use std::rc::Rc;
 use std::collections::HashSet;
 
 use rand::thread_rng;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 
-use super::{BorderIndex, PlateIndex, TileIndex, Tile};
+use super::{BorderIndex, PlateIndex, TileIndex};
 
 #[derive(Debug, Clone)]
 pub struct Plate {

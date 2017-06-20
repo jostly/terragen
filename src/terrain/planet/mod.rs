@@ -13,7 +13,7 @@ use rand::thread_rng;
 use rand::Rng;
 use rand::distributions::{IndependentSample, Range};
 
-use noise::{Fbm, NoiseModule, MultiFractal, RidgedMulti};
+use noise::{NoiseModule, RidgedMulti};
 
 pub use self::plate::Plate;
 pub use self::border::Border;
@@ -117,7 +117,7 @@ impl Planet {
         }
 */
 
-        let mut fbm = RidgedMulti::new();
+        let fbm = RidgedMulti::new();
         //fbm = fbm.set_frequency(7.5);
 
         let mut elevations = Vec::with_capacity(num_corners);

@@ -179,7 +179,7 @@ fn generate_dual(generator: Generator,
 
     sw.restart();
 
-    let (min_elevation, scale) = planet.get_elevation_scale();
+    let (lower_scale, upper_scale) = planet.get_elevation_scale();
 
     let mut vertex_index = 0;
     for tile in planet.tiles_iter() {
@@ -195,8 +195,15 @@ fn generate_dual(generator: Generator,
 
             (pid as f32 + 0.5) / 16.0
         } else {
-            let elevation = (planet.tile_elevation(tile) - min_elevation) / scale;
-            1.0 - elevation.powf(1.5)
+            let mut elevation = planet.tile_elevation(tile);
+            if elevation < 0.0 {
+                elevation /= lower_scale;
+            }
+            else if elevation >= 0.0 {
+                elevation /= upper_scale;
+            }
+
+            (1.0 - elevation) / 2.0
         };
 
         let uv = Point2::new(colour.min(1.0).max(0.0), 0.10);

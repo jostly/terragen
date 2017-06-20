@@ -382,7 +382,40 @@ impl Generator {
         true
     }
 
-    pub fn distort(&mut self, degree: u32) -> bool {
+    pub fn introduce_chaos(&mut self, topology_distortion_rate: f32)  {
+        let mut total_distortion =
+            (self.num_edges() as f32 * topology_distortion_rate).ceil() as u32;
+        let mut iterations = 6;
+        while iterations > 0 {
+            let iteration_distortion = total_distortion / iterations;
+            total_distortion -= iteration_distortion;
+            if !self.distort(iteration_distortion) {
+                break;
+            }
+            self.relax(0.5);
+            iterations -= 1;
+        }
+
+        let max_relax = 200;
+        let mut last_move = f32::MAX;
+        let mut i = 1;
+        let num_nodes = self.num_nodes() as f32;
+        let average_node_radius = (f32::consts::PI * 4.0 / num_nodes).sqrt();
+        let min_shift_delta = average_node_radius * num_nodes / 50000.0;
+        while i <= max_relax {
+            let rel = self.relax(0.5);
+            debug!("Relaxation iteration {}: {}", i, rel);
+            let diff = (last_move - rel).abs();
+            if diff < min_shift_delta {
+                debug!("Relaxation converging with diff {}", diff);
+                break;
+            }
+            last_move = rel;
+            i += 1;
+        }
+    }
+
+    fn distort(&mut self, degree: u32) -> bool {
         debug!("Distorting to degree {}", degree);
         let num_edges = self.edges.len() as u32;
         let mut rng = thread_rng();
@@ -403,7 +436,7 @@ impl Generator {
         true
     }
 
-    pub fn relax(&mut self, multiplier: f32) -> f32 {
+    fn relax(&mut self, multiplier: f32) -> f32 {
         let total_surface_area = 4.0 * f32::consts::PI;
         let ideal_face_area = total_surface_area / self.faces.len() as f32;
         let q3 = 3.0f32.sqrt();

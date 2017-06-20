@@ -8,12 +8,15 @@ extern crate env_logger;
 extern crate stopwatch;
 extern crate gl;
 extern crate noise;
+#[macro_use]
+extern crate clap;
 
 mod terrain;
 mod math;
 mod geom;
 mod render;
 
+use clap::App;
 use na::{Vector3, UnitQuaternion, Point2, Point3};
 use kiss3d::window::Window;
 use kiss3d::light::Light;
@@ -23,8 +26,6 @@ use kiss3d::resource::{Mesh, Material};
 use kiss3d::text::Font;
 
 use glfw::{Action, Key, WindowEvent};
-
-use stopwatch::Stopwatch;
 
 use terrain::generator::Generator;
 use terrain::planet::Planet;
@@ -38,12 +39,30 @@ use std::sync::mpsc::channel;
 use std::f32;
 
 fn main() {
-
     env_logger::init().unwrap();
+
+    let matches = App::new("terragen")
+        .version(crate_version!())
+        .args_from_usage(
+            "-l, --level=[LEVEL] 'Sets subdivision level'
+            -d, --distortion=[RATE] 'Sets topology distortion rate [0.0 .. 1.0]'")
+        .get_matches();
+
+    // 0 -- 0.15
+    let topology_distortion_rate = matches.value_of("distortion").unwrap_or("0.25").parse::<f32>().unwrap() * 0.15;
+    let subdivision_level = matches.value_of("level").unwrap_or("4").parse::<u32>().unwrap();
+
+    println!("Topology distortion rate: {}", topology_distortion_rate);
+    println!("Subdivision level: {}", subdivision_level);
 
     let (tx, rx) = channel();
 
-    let terr = Generator::new();
+    let mut terr = Generator::new();
+    for _ in 0..subdivision_level {
+        terr.subdivide();
+    }
+    terr.introduce_chaos(topology_distortion_rate);
+
     let mut generator: Option<Generator> = Some(terr);
     let mut planet: Option<Planet> = None;
 
@@ -58,7 +77,7 @@ fn main() {
     window.set_light(Light::StickToCamera);
 
     let wireframe_material = Rc::new(RefCell::new(Box::new(WireframeMaterial::new()) as
-                                                  Box<Material + 'static>));
+        Box<Material + 'static>));
 
     let rot = UnitQuaternion::from_axis_angle(&Vector3::y_axis(), 0.001);
 
@@ -72,23 +91,32 @@ fn main() {
     let mut rotate = false;
     let mut current_level = 0;
     let mut num_tiles = 0;
+    let mut max_depth = 0.0;
+    let mut max_elevation = 0.0;
 
     while window.render_with_camera(&mut arc_ball) {
-        let text_point = Point2::new(50.0, 50.0);
-
         if let Some(ref gen) = generator {
             current_level = gen.current_level();
         }
         if let Some(ref pla) = planet {
             num_tiles = pla.num_tiles();
+            let (d, e) = pla.get_elevation_scale();
+            max_depth = d;
+            max_elevation = e;
         }
         window.draw_text(&format!("Level: {}\nTiles: {}", current_level, num_tiles),
-                         &text_point,
+                         &Point2::new(50.0, 50.0),
+                         &font,
+                         &Point3::new(1.0, 1.0, 1.0));
+
+        window.draw_text(&format!("Depth: {:.0}\nElevation: {:.0}", max_depth, max_elevation),
+                         &Point2::new(50.0, 1600.0),
                          &font,
                          &Point3::new(1.0, 1.0, 1.0));
 
         for mut event in window.events().iter() {
             match event.value {
+                /*
                 WindowEvent::Key(Key::Space, _, Action::Release, _) => {
                     if let Some(ref mut gen) = generator {
                         info!("Subdividing a level {} terrain", gen.current_level());
@@ -103,7 +131,6 @@ fn main() {
                 }
                 WindowEvent::Key(Key::A, _, Action::Release, _) => {
                     if let Some(ref mut gen) = generator {
-                        let topology_distortion_rate = 0.04; // 0 - 0.15
                         let mut total_distortion =
                             (gen.num_edges() as f32 * topology_distortion_rate).ceil() as u32;
                         let mut iterations = 6;
@@ -143,6 +170,7 @@ fn main() {
                         event.inhibited = true
                     }
                 }
+                */
                 WindowEvent::Key(Key::D, _, Action::Release, _) => {
                     visualization_index = (visualization_index + 1) % visualization_types.len();
                     regenerate_mesh = true;
@@ -210,7 +238,6 @@ fn main() {
             grp.prepend_to_local_rotation(&rot);
         }
     }
-
 }
 
 fn add_mesh(visualization: Visualization,
@@ -229,7 +256,7 @@ fn add_mesh(visualization: Visualization,
         let scale = 1.001;
         let mut c = grp.add_mesh(mesh, Vector3::new(scale, scale, scale));
 
-        c.set_color(0.0, 0.0, 0.0);
+        c.set_color(1.0, 1.0, 1.0);
         c.set_lines_width(2.0);
         c.set_material(wireframe_material);
     }
@@ -240,9 +267,9 @@ fn add_mesh(visualization: Visualization,
 
     c.set_color(1.0, 1.0, 1.0);
     if visualization == Visualization::Plates {
-        c.set_texture_from_file(&Path::new("media/groups.png"), "colour_ramp");
+        c.set_texture_from_file(&Path::new("media/groups.png"), "groups");
     } else {
-        c.set_texture_from_file(&Path::new("media/height_ramp.png"), "colour_ramp");
+        c.set_texture_from_file(&Path::new("media/elevation.png"), "elevation");
     }
     c.enable_backface_culling(true);
 

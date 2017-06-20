@@ -192,11 +192,10 @@ impl Planet {
             }
         }
 
-        let scale = max_elevation - min_elevation;
+        // [min_elevation, 0] -> [-1, 0]  y = x / -min_elevation
+        // [0, max_elevation] -> [0, 1]   y = x / max_elevation
 
-        println!("Elevations: {} to {}", min_elevation, max_elevation);
-
-        (min_elevation, scale)
+        (-min_elevation, max_elevation)
     }
 
     fn initialize_plates(&mut self, num_plates: usize) -> Vec<(TileIndex, u32)> {
